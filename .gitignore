@@ -4,3 +4,4 @@ node_modules
 out
 dist
 tsconfig.tsbuildinfo
+.svelte-kit

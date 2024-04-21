@@ -1,41 +1,21 @@
 <!DOCTYPE html>
-
 <html lang="en">
-
     <head>
-
-        <link
-            rel="stylesheet"
-            href="./style/error.scss"
-        >
-
-        <link
-            rel="icon"
-            type="image/svg"
-            href="/static/assets/icons/error.svg"
-        >
-        
-        <link
-            rel="stylesheet"
-            href="/api/v1/account/me/css"
-        >
-
-        <meta 
-            name="viewport" 
+        <link rel="stylesheet" href="./style/error.scss" />
+        <link rel="icon" type="image/svg" href="/assets/icons/error.svg" />
+        <link rel="stylesheet" href="/api/v1/account/me/css" />
+        <meta
+            name="viewport"
             content="width=device-width, initial-scale=1.0, user-scalable=0"
-        >
-
-        <title>$code</title>
-
-        <meta name="theme-color" content="rgb(30, 33, 36)">
-
+        />
+        <title>%sveltekit.status%</title>
+        <meta name="theme-color" content="rgb(30, 33, 36)" />
     </head>
 
     <body>
         <p class="error">
-            <span class="code">$code</span>
-            &nbsp;$text
+            <span class="code">%sveltekit.status%</span>
+            &nbsp;%sveltekit.error.message%
         </p>
     </body>
-
 </html>

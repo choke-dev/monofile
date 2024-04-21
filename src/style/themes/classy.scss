@@ -1,164 +1,162 @@
-#uploadWindow {
-    color: #FFFFFF
+main {
+    color: #ffffff;
 }
 
 body {
-    background-color:#DDDDDD;
+    background-color: #dddddd;
 }
 
 #appContent {
     background: darkgray;
-    @media screen and (max-width:500px) {
-        background:white;
+    @media screen and (max-width: 500px) {
+        background: white;
     }
 }
 
-#uploadWindow {
+main {
     background: white;
 
-    color:black;
+    color: black;
 
-    h1, p, a {
+    h1,
+    p,
+    a {
         margin: 0px;
         font-size: 14px;
     }
 
     a {
-        color:rgb(153, 153, 153);
+        color: rgb(153, 153, 153);
     }
 
     h1 {
-        font-weight:600;
+        font-weight: 600;
         font-size: 25px;
-        text-align:center;
+        text-align: center;
 
-        @media screen and (max-width:500px) {
+        @media screen and (max-width: 500px) {
             font-size: 30px;
         }
     }
 
     & > p:nth-of-type(1) {
-        text-align:center;
+        text-align: center;
         font-style: italic;
-        font-weight:600;
+        font-weight: 600;
         font-size: 16px;
-        color:black !important;
-        @media screen and (max-width:500px) {
+        color: black !important;
+        @media screen and (max-width: 500px) {
             font-size: 21px;
         }
     }
 
     button {
-        cursor:pointer;
-        color:black;
-        border:none;
-        outline:none;
-        padding:5px;
-        background: #AAAAAA;
+        cursor: pointer;
+        color: black;
+        border: none;
+        outline: none;
+        padding: 5px;
+        background: #aaaaaa;
 
         @media screen and (max-width: 500px) {
-            font-size:16px;
-            padding:10px;
+            font-size: 16px;
+            padding: 10px;
         }
 
         &:hover {
             outline: 1px solid #333333;
             color: black;
-            background-color:#AAAAAA;
+            background-color: #aaaaaa;
         }
     }
 
     & > button:nth-last-of-type(1) {
-        background-color:#66AAFF;
+        background-color: #66aaff;
         &:hover {
-            background-color:#66AAFF;
+            background-color: #66aaff;
         }
     }
 
     #add_new_files {
-        background-color: #AAAAAA66;
-        border:1px solid #AAAAAA;
+        background-color: #aaaaaa66;
+        border: 1px solid #aaaaaa;
 
         #file_add_btns {
-            button, input[type=text] {
-                transition-duration:0s;
-                
+            button,
+            input[type="text"] {
+                transition-duration: 0s;
+
                 @media screen and (max-width: 500px) {
-                    font-size:16px;
-                    padding:10px;
+                    font-size: 16px;
+                    padding: 10px;
                 }
             }
 
-            input[type=text] {
+            input[type="text"] {
                 font-family: "Fira Code", monospace;
-                background-color:#AAAAAA;
-                color:black;
+                background-color: #aaaaaa;
+                color: black;
             }
 
             button {
-                cursor:pointer;
-                background-color:#AAAAAA;
+                cursor: pointer;
+                background-color: #aaaaaa;
                 color: black;
 
                 &:hover {
                     flex-basis: 50%;
-                    transition-duration:0s;
-                    background-color:#AAAAAA;
+                    transition-duration: 0s;
+                    background-color: #aaaaaa;
                     color: black;
                     outline: 1px solid #333333;
                 }
             }
 
             .fileUpload {
-                background-color:#AAAAAA;
-                transition-duration:250ms;
+                background-color: #aaaaaa;
+                transition-duration: 250ms;
 
                 &:hover {
-                    transition-duration:0s;
-                    background-color:#AAAAAA;
+                    transition-duration: 0s;
+                    background-color: #aaaaaa;
                 }
             }
         }
     }
 
     .file {
-        background-color: #AAAAAA66;
-        border: 1px solid #AAAAAA;
+        background-color: #aaaaaa66;
+        border: 1px solid #aaaaaa;
 
-        input[type=text] {
+        input[type="text"] {
             font-family: "Fira Code", monospace;
-            background-color:#AAAAAA;
-            color:black;
+            background-color: #aaaaaa;
+            color: black;
         }
     }
-    
 }
 
-* {
-    /* nice scrollbars aren't needed on mobile so */
-    @media screen and (min-width:500px) {
-        
-        &::-webkit-scrollbar {
-            width:5px;
-        }
+/* nice scrollbars aren't needed on mobile so */
+@media screen and (min-width: 500px) {
+    ::-webkit-scrollbar {
+        width: 5px;
+    }
 
-        &::-webkit-scrollbar-track {
-            background-color:#AAAAAA;
-        }
+    ::-webkit-scrollbar-track {
+        background-color: #aaaaaa;
+    }
 
-        &::-webkit-scrollbar-thumb {
-            background-color:#DDDDDD;
+    ::-webkit-scrollbar-thumb {
+        background-color: #dddddd;
 
-            &:hover {
-                background-color:#FFFFFF;
-            }
+        &:hover {
+            background-color: #ffffff;
         }
-    
     }
 }
 
 #topbar {
-    background-color: #DDDDDD;
+    background-color: #dddddd;
 }
 
 .error {

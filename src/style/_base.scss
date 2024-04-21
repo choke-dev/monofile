@@ -3,20 +3,15 @@
     from the server but it's fine for now 
 */
 
-@import url("/static/assets/fonts/inconsolata.css");
-@import url("/static/assets/fonts/source_sans.css");
-@import url("/static/assets/fonts/fira_code.css");
+@import url("/assets/fonts/inconsolata.css");
+@import url("/assets/fonts/source_sans.css");
+@import url("/assets/fonts/fira_code.css");
 
-$FallbackFonts: 
-    -apple-system, 
-    system-ui, 
-    BlinkMacSystemFont, 
-    "Segoe UI", 
-    Roboto,
+$FallbackFonts: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto,
     sans-serif;
 
 %normal {
-    font-family: "Source Sans Pro", $FallbackFonts
+    font-family: "Source Sans Pro", $FallbackFonts;
 }
 
 /* 
@@ -25,14 +20,17 @@ $FallbackFonts:
     (it's just in case)
 */
 
-*:not(span), .normal { @extend %normal; }
+*:not(span),
+.normal {
+    @extend %normal;
+}
 
 /*
     for code blocks / terminal
 */
 
 .monospace {
-    font-family: "Fira Code", monospace
+    font-family: "Fira Code", monospace;
 }
 
 /*
@@ -49,37 +47,33 @@ $darkish: rgb(54, 62, 70);
 
 body {
     background-color: rgb(30, 33, 36); // this is here so that
-                                         // pulling down to refresh
-                                         // on mobile looks good
+    // pulling down to refresh
+    // on mobile looks good
 }
 
 #appContent {
-    background-color: $Background
+    background-color: $Background;
 }
 
 /*
     scrollbars
 */
 
-* {
-    /* nice scrollbars aren't needed on mobile so */
-    @media screen and (min-width:500px) {
-        
-        &::-webkit-scrollbar {
-            width:5px;
-        }
+/* nice scrollbars aren't needed on mobile so */
+@media screen and (min-width: 500px) {
+    ::-webkit-scrollbar {
+        width: 5px;
+    }
 
-        &::-webkit-scrollbar-track {
-            background-color:#222222;
-        }
+    ::-webkit-scrollbar-track {
+        background-color: #222222;
+    }
 
-        &::-webkit-scrollbar-thumb {
-            background-color:#333;
+    ::-webkit-scrollbar-thumb {
+        background-color: #333;
 
-            &:hover {
-                background-color:#373737;
-            }
+        &:hover {
+            background-color: #373737;
         }
-    
     }
 }
