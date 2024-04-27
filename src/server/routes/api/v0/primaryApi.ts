@@ -1,4 +1,4 @@
-import { Hono } from "hono"
+import { Context, Hono } from "hono"
 import * as Accounts from "../../../lib/accounts.js"
 import * as auth from "../../../lib/auth.js"
 import RangeParser, { type Range } from "range-parser"
@@ -20,8 +20,8 @@ export let primaryApi = new Hono<{
 
 primaryApi.all("*", getAccount)
 
-export default function (files: Files, apiRoot: Hono) {
-    primaryApi.get("/file/:fileId", async (ctx) => 
+function fileReader(apiRoot: Hono) {
+    return async (ctx: Context) =>
         apiRoot.fetch(
             new Request(
                 (new URL(
@@ -30,7 +30,12 @@ export default function (files: Files, apiRoot: Hono) {
             ), 
             ctx.env
         )
-    )
+}
+
+export default function (files: Files, apiRoot: Hono) {
+
+    primaryApi.get("/file/:fileId", fileReader(apiRoot))
+    primaryApi.get("/cpt/:fileId/*", fileReader(apiRoot))
 
     primaryApi.post("/upload", async (ctx) => 
         apiRoot.fetch(
