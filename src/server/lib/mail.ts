@@ -1,16 +1,18 @@
 import { createTransport } from "nodemailer"
-import "dotenv/config"
-import config from "../../../config.json" assert { type: "json" }
+import config from "./config.js"
 import { generateFileId } from "./files.js"
 
-let mailConfig = config.mail,
-    transport = createTransport({
-        ...mailConfig.transport,
-        auth: {
-            user: process.env.MAIL__USER,
-            pass: process.env.MAIL__PASS,
-        },
-    })
+const { mail } = config
+const transport = createTransport({
+    host: mail.transport.host,
+    port: mail.transport.port,
+    secure: mail.transport.secure,
+    from: mail.send.from,
+    auth: {
+        user: mail.user,
+        pass: mail.pass,
+    },
+})
 
 /**
  * @description Sends an email
@@ -23,7 +25,6 @@ export function sendMail(to: string, subject: string, content: string) {
     return transport.sendMail({
         to,
         subject,
-        from: mailConfig.send.from,
         html: `<span style="font-size:x-large;font-weight:600;">monofile <span style="opacity:0.5">accounts</span></span><br><span style="opacity:0.5">Gain control of your uploads.</span><hr><br>${content
             .replaceAll(
                 "<span username>",
