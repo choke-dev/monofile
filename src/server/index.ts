@@ -10,7 +10,7 @@ import preview from "./routes/api/web/preview.js"
 import { fileURLToPath } from "url"
 import { dirname } from "path"
 import pkg from "../../package.json" assert { type: "json" }
-import config from "../../config.json" assert { type: "json" }
+import config, { ClientConfiguration } from "./lib/config.js"
 
 const app = new Hono()
 
@@ -67,7 +67,7 @@ app.get("/server", (ctx) =>
         maxDiscordFiles: config.maxDiscordFiles,
         maxDiscordFileSize: config.maxDiscordFileSize,
         accounts: config.accounts,
-    })
+    } as ClientConfiguration)
 )
 
 // funcs

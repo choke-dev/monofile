@@ -4,8 +4,8 @@ import Files from "./lib/files.js"
 import { program } from "commander"
 import { basename } from "path"
 import { Writable } from "node:stream"
+import config from "./lib/config.js"
 import pkg from "../../package.json" assert { type: "json" }
-import config from "../../config.json" assert { type: "json" }
 import { fileURLToPath } from "url"
 import { dirname } from "path"
 
@@ -23,65 +23,61 @@ program
     .description("Quickly run monofile to execute a query or so")
     .version(pkg.version)
 
-program.command("list")
+program
+    .command("list")
     .alias("ls")
     .description("List files in the database")
     .action(() => {
-        Object.keys(files.files).forEach(e => console.log(e))
+        Object.keys(files.files).forEach((e) => console.log(e))
     })
 
-
-program.command("download")
+program
+    .command("download")
     .alias("dl")
     .description("Download a file from the database")
     .argument("<id>", "ID of the file you'd like to download")
-    .option("-o, --output <path>", 'Folder or filename to output to')
+    .option("-o, --output <path>", "Folder or filename to output to")
     .action(async (id, options) => {
-
-        await (new Promise<void>(resolve => setTimeout(() => resolve(), 1000)))
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
 
         let fp = files.files[id]
 
-        if (!fp)
-            throw `file ${id} not found`
-        
-        let out = options.output as string || `./`
+        if (!fp) throw `file ${id} not found`
+
+        let out = (options.output as string) || `./`
 
         if (fs.existsSync(out) && (await stat(out)).isDirectory())
             out = `${out.replace(/\/+$/, "")}/${fp.filename}`
 
         let filestream = await files.readFileStream(id)
 
-        let prog=0
-        filestream.on("data", dt => {
-            prog+=dt.byteLength
-            console.log(`Downloading ${fp.filename}: ${Math.floor(prog/(fp.sizeInBytes??0)*10000)/100}% (${Math.floor(prog/(1024*1024))}MiB/${Math.floor((fp.sizeInBytes??0)/(1024*1024))}MiB)`)
+        let prog = 0
+        filestream.on("data", (dt) => {
+            prog += dt.byteLength
+            console.log(
+                `Downloading ${fp.filename}: ${Math.floor((prog / (fp.sizeInBytes ?? 0)) * 10000) / 100}% (${Math.floor(prog / (1024 * 1024))}MiB/${Math.floor((fp.sizeInBytes ?? 0) / (1024 * 1024))}MiB)`
+            )
         })
 
-        filestream.pipe(
-            fs.createWriteStream(out)
-        )
+        filestream.pipe(fs.createWriteStream(out))
     })
 
-
-program.command("upload")
+program
+    .command("upload")
     .alias("up")
     .description("Upload a file to the instance")
     .argument("<file>", "Path to the file you'd like to upload")
-    .option("-id, --fileid <id>", 'Custom file ID to use')
+    .option("-id, --fileid <id>", "Custom file ID to use")
     .action(async (file, options) => {
-
-        await (new Promise<void>(resolve => setTimeout(() => resolve(), 1000)))
+        await new Promise<void>((resolve) => setTimeout(() => resolve(), 1000))
 
         if (!(fs.existsSync(file) && (await stat(file)).isFile()))
             throw `${file} is not a file`
-    
+
         let writable = files.createWriteStream()
 
-        writable
-            .setName(basename(file))
-            ?.setType("application/octet-stream")
-            
+        writable.setName(basename(file))?.setType("application/octet-stream")
+
         if (options.id) writable.setUploadId(options.id)
 
         if (!(writable instanceof Writable))
@@ -90,7 +86,7 @@ program.command("upload")
         console.log(`started: ${file}`)
 
         writable.on("drain", () => {
-            console.log("Drained");
+            console.log("Drained")
         })
 
         writable.on("finish", async () => {
@@ -108,11 +104,9 @@ program.command("upload")
 
         writable.on("close", () => {
             console.log("Closed.")
-        });
+        })
 
-        ;(await fs.createReadStream(file)).pipe(
-            writable
-        )
+        ;(await fs.createReadStream(file)).pipe(writable)
     })
 
 program.parse()

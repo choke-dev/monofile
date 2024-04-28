@@ -4,7 +4,7 @@ import crypto from "node:crypto"
 import { files } from "./accounts.js"
 import { Client as API } from "./DiscordAPI/index.js"
 import type { APIAttachment } from "discord-api-types/v10"
-import config from "./config.js"
+import config, { Configuration } from "./config.js"
 import "dotenv/config"
 
 import * as Accounts from "./accounts.js"
@@ -46,22 +46,6 @@ function multiAssert(
 
 export type FileUploadSettings = Partial<Pick<FilePointer, "mime" | "owner">> &
     Pick<FilePointer, "mime" | "filename"> & { uploadId?: string }
-
-export interface Configuration {
-    maxDiscordFiles: number
-    maxDiscordFileSize: number
-    targetChannel: string
-    requestTimeout: number
-    maxUploadIdLength: number
-
-    accounts: {
-        registrationEnabled: boolean
-        requiredForUpload: boolean
-    }
-
-    trustProxy: boolean
-    forceSSL: boolean
-}
 
 export interface FilePointer {
     filename: string

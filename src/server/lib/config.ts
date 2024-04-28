@@ -1,5 +1,45 @@
 import "dotenv/config"
 
+export interface Configuration {
+    port: number
+    requestTimeout: number
+    trustProxy: boolean
+    forceSSL: boolean
+    discordToken: string
+    maxDiscordFiles: number
+    maxDiscordFileSize: number
+    maxUploadIdLength: number
+    targetGuild: string
+    targetChannel: string
+    accounts: {
+        registrationEnabled: boolean
+        requiredForUpload: boolean
+    }
+    mail: {
+        transport: {
+            host: string
+            port: number
+            secure: boolean
+        }
+        send: {
+            from: string
+        }
+        user: string
+        pass: string
+    }
+}
+
+export interface ClientConfiguration {
+    version: string
+    files: number
+    maxDiscordFiles: number
+    maxDiscordFileSize: number
+    accounts: {
+        registrationEnabled: boolean
+        requiredForUpload: boolean
+    }
+}
+
 export default {
     port: Number(process.env.PORT),
     requestTimeout: Number(process.env.REQUEST_TIMEOUT),
@@ -29,4 +69,4 @@ export default {
         user: process.env.MAIL__USER,
         pass: process.env.MAIL__PASS,
     },
-}
+} as Configuration
