@@ -1,5 +1,6 @@
 services:
     monofile:
+        container_name: "monofile"
         image: monofile
         build: .
         env_file: .env

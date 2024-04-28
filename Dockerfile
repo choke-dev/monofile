@@ -21,6 +21,7 @@ COPY --from=install /tmp/prod/node_modules node_modules
 COPY --from=build /usr/src/app/out out
 COPY --from=build /usr/src/app/dist dist
 COPY package.json .
+COPY assets assets
 
 EXPOSE 3000
 ENTRYPOINT [ "node", "./out/server/index.js" ]
