@@ -1,8 +1,8 @@
 import { Hono } from "hono"
-import { readFile, readdir } from "fs/promises"
 import Files from "../lib/files.js"
-import {fileURLToPath} from "url"
-import {dirname} from "path"
+import { fileURLToPath } from "url"
+import { dirname } from "path"
+import apis from "./api/apis.js"
 
 const APIDirectory = dirname(fileURLToPath(import.meta.url)) + "/api"
 
@@ -39,10 +39,12 @@ class APIVersion {
 
     async load() {
         for (let _mount of this.definition.mount) {
-            let mount = resolveMount(_mount);
+            let mount = resolveMount(_mount)
             // no idea if there's a better way to do this but this is all i can think of
-            let { default: route } = await import(`${this.apiPath}/${mount.file}.js`) as { default: (files: Files, apiRoot: Hono) => Hono }
-            
+            let { default: route } = (await import(
+                `${this.apiPath}/${mount.file}.js`
+            )) as { default: (files: Files, apiRoot: Hono) => Hono }
+
             this.root.route(mount.to, route(this.files, this.apiRoot))
         }
     }
@@ -67,23 +69,12 @@ export default class APIRouter {
         let def = new APIVersion(definition, this.files, this.root)
         await def.load()
 
-        this.root.route(
-            definition.baseURL,
-            def.root
-        )
+        this.root.route(definition.baseURL, def.root)
     }
 
     async loadAPIMethods() {
-        let files = await readdir(APIDirectory)
-        for (let version of files) {
-            let def = JSON.parse(
-                (
-                    await readFile(
-                        `${process.cwd()}/src/server/routes/api/${version}/api.json`
-                    )
-                ).toString()
-            ) as APIDefinition
-            await this.mount(def)
+        for (let api of apis) {
+            await this.mount(api as APIDefinition)
         }
     }
 }
