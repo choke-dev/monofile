@@ -47,7 +47,7 @@ export default {
     forceSSL: process.env.FORCE_SSL === "true",
     discordToken: process.env.DISCORD__TOKEN,
     maxDiscordFiles: Number(process.env.MAX__DISCORD_FILES),
-    maxDiscordFileSize: Number(process.env.MAX__DISCORD_FILES),
+    maxDiscordFileSize: Number(process.env.MAX__DISCORD_FILE_SIZE),
     maxUploadIdLength: Number(process.env.MAX__UPLOAD_ID_LENGTH),
     targetGuild: process.env.TARGET__GUILD,
     targetChannel: process.env.TARGET__CHANNEL,
