@@ -1,12 +1,10 @@
 {
-  "compilerOptions": {
-    "rootDir": ".",
-    "outDir": ".", 
-    "resolveJsonModule": true,
-    "composite": true,
-    "skipLibCheck": true
-  },
-  "files": [
-    "package.json", "config.json"
-  ]
+    "compilerOptions": {
+        "rootDir": ".",
+        "outDir": ".",
+        "resolveJsonModule": true,
+        "composite": true,
+        "skipLibCheck": true
+    },
+    "files": ["package.json"]
 }

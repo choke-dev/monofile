@@ -18,8 +18,9 @@ RUN npm run build
 
 FROM base AS app
 COPY --from=install /tmp/prod/node_modules node_modules
-COPY --from=build out ./
+COPY --from=build /usr/src/app/out out
+COPY --from=build /usr/src/app/dist dist
 COPY package.json .
 
 EXPOSE 3000
-ENTRYPOINT [ "node", "./index.js" ]
+ENTRYPOINT [ "node", "./out/server/index.js" ]

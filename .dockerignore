@@ -1,7 +1,6 @@
 .vscode
 .gitignore
 .prettierrc
-config.json
 LICENSE
 README.md
 node_modules
