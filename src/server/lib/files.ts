@@ -3,7 +3,8 @@ import { Readable, Writable } from "node:stream"
 import crypto from "node:crypto"
 import { files } from "./accounts.js"
 import { Client as API } from "./DiscordAPI/index.js"
-import type {APIAttachment} from "discord-api-types/v10"
+import type { APIAttachment } from "discord-api-types/v10"
+import config from "./config.js"
 import "dotenv/config"
 
 import * as Accounts from "./accounts.js"
@@ -32,10 +33,12 @@ export function generateFileId(length: number = 5) {
 
 /**
  * @description Assert multiple conditions... this exists out of pure laziness
- * @param conditions 
+ * @param conditions
  */
 
-function multiAssert(conditions: Map<boolean, { message: string, status: number }>) {
+function multiAssert(
+    conditions: Map<boolean, { message: string; status: number }>
+) {
     for (let [cond, err] of conditions.entries()) {
         if (cond) return err
     }
@@ -80,18 +83,15 @@ export interface StatusCodeError {
 }
 
 export class WebError extends Error {
-
     readonly statusCode: number = 500
-    
+
     constructor(status: number, message: string) {
         super(message)
         this.statusCode = status
     }
-
 }
 
 export class ReadStream extends Readable {
-
     files: Files
     pointer: FilePointer
 
@@ -100,52 +100,60 @@ export class ReadStream extends Readable {
     position: number = 0
 
     ranges: {
-        useRanges: boolean,
-        byteStart: number,
+        useRanges: boolean
+        byteStart: number
         byteEnd: number
-        scan_msg_begin: number,
-        scan_msg_end: number,
-        scan_files_begin: number,
+        scan_msg_begin: number
+        scan_msg_end: number
+        scan_files_begin: number
         scan_files_end: number
     }
 
     id: number = Math.random()
     aborter?: AbortController
 
-    constructor(files: Files, pointer: FilePointer, range?: {start: number, end: number}) {
+    constructor(
+        files: Files,
+        pointer: FilePointer,
+        range?: { start: number; end: number }
+    ) {
         super()
         console.log(this.id, range)
         this.files = files
         this.pointer = pointer
 
-        let useRanges = 
-            Boolean(range && pointer.chunkSize && pointer.sizeInBytes)
-        
+        let useRanges = Boolean(
+            range && pointer.chunkSize && pointer.sizeInBytes
+        )
+
         this.ranges = {
             useRanges,
             scan_msg_begin: 0,
             scan_msg_end: pointer.messageids.length - 1,
-            scan_files_begin: 
-                useRanges
+            scan_files_begin: useRanges
                 ? Math.floor(range!.start / pointer.chunkSize!)
                 : 0,
-            scan_files_end: 
-                useRanges
+            scan_files_end: useRanges
                 ? Math.ceil(range!.end / pointer.chunkSize!) - 1
                 : -1,
             byteStart: range?.start || 0,
-            byteEnd: range?.end || 0
+            byteEnd: range?.end || 0,
         }
 
         if (useRanges)
-            this.ranges.scan_msg_begin = Math.floor(this.ranges.scan_files_begin / 10),
-            this.ranges.scan_msg_end = Math.ceil(this.ranges.scan_files_end / 10),
-            this.msgIdx = this.ranges.scan_msg_begin
-        
+            (this.ranges.scan_msg_begin = Math.floor(
+                this.ranges.scan_files_begin / 10
+            )),
+                (this.ranges.scan_msg_end = Math.ceil(
+                    this.ranges.scan_files_end / 10
+                )),
+                (this.msgIdx = this.ranges.scan_msg_begin)
+
         console.log(this.ranges)
     }
 
-    async _read() {/*
+    async _read() {
+        /*
         console.log("Calling for more data")
         if (this.busy) return
         this.busy = true
@@ -160,24 +168,32 @@ export class ReadStream extends Readable {
         this.pushData()
     }
 
-    async _destroy(error: Error | null, callback: (error?: Error | null | undefined) => void): Promise<void> {
-        if (this.aborter)
-            this.aborter.abort()
+    async _destroy(
+        error: Error | null,
+        callback: (error?: Error | null | undefined) => void
+    ): Promise<void> {
+        if (this.aborter) this.aborter.abort()
         callback()
     }
 
     async getNextAttachment() {
         // return first in our attachment buffer
-        let ret = this.attachmentBuffer.splice(0,1)[0]
+        let ret = this.attachmentBuffer.splice(0, 1)[0]
         if (ret) return ret
 
-        console.log(this.id, this.msgIdx, this.ranges.scan_msg_end, this.pointer.messageids[this.msgIdx])
+        console.log(
+            this.id,
+            this.msgIdx,
+            this.ranges.scan_msg_end,
+            this.pointer.messageids[this.msgIdx]
+        )
 
         // oh, there's none left. let's fetch a new message, then.
         if (
-            !this.pointer.messageids[this.msgIdx] 
-            || this.msgIdx > this.ranges.scan_msg_end
-        ) return null
+            !this.pointer.messageids[this.msgIdx] ||
+            this.msgIdx > this.ranges.scan_msg_end
+        )
+            return null
 
         let msg = await this.files.api
             .fetchMessage(this.pointer.messageids[this.msgIdx])
@@ -190,95 +206,113 @@ export class ReadStream extends Readable {
             let attach = msg.attachments
             console.log(attach)
 
-            this.attachmentBuffer = this.ranges.useRanges ? attach.slice(
-                this.msgIdx == this.ranges.scan_msg_begin
-                        ? this.ranges.scan_files_begin - this.ranges.scan_msg_begin * 10
-                    : 0,
-                this.msgIdx == this.ranges.scan_msg_end
-                    ? this.ranges.scan_files_end - this.ranges.scan_msg_end * 10 + 1
-                    : attach.length
-            ) : attach
+            this.attachmentBuffer = this.ranges.useRanges
+                ? attach.slice(
+                      this.msgIdx == this.ranges.scan_msg_begin
+                          ? this.ranges.scan_files_begin -
+                                this.ranges.scan_msg_begin * 10
+                          : 0,
+                      this.msgIdx == this.ranges.scan_msg_end
+                          ? this.ranges.scan_files_end -
+                                this.ranges.scan_msg_end * 10 +
+                                1
+                          : attach.length
+                  )
+                : attach
 
             console.log(this.attachmentBuffer)
         }
 
         this.msgIdx++
-        return this.attachmentBuffer.splice(0,1)[0]
+        return this.attachmentBuffer.splice(0, 1)[0]
     }
 
     async getPusherForWebStream(webStream: ReadableStream) {
         const reader = await webStream.getReader()
         let pushing = false // acts as a debounce just in case
-                            // (words of a girl paranoid from writing readfilestream)
+        // (words of a girl paranoid from writing readfilestream)
 
         let pushToStream = this.push.bind(this)
         let stream = this
-        
-        return function() {
+
+        return function () {
             if (pushing) return
             pushing = true
 
-            return reader.read().catch(e => {
-                // Probably means an AbortError; whatever it is we'll need to abort
-                if (webStream.locked) reader.releaseLock()
-                webStream.cancel().catch(e => undefined)
-                if (!stream.destroyed) stream.destroy()
-                return e
-            }).then(result => {
-                if (result instanceof Error || !result) return result
-                
-                let pushed
-                if (!result.done) {
-                    pushing = false
-                    pushed = pushToStream(result.value) 
-                }
-                return {readyForMore: pushed || false, streamDone: result.done }
-            })
+            return reader
+                .read()
+                .catch((e) => {
+                    // Probably means an AbortError; whatever it is we'll need to abort
+                    if (webStream.locked) reader.releaseLock()
+                    webStream.cancel().catch((e) => undefined)
+                    if (!stream.destroyed) stream.destroy()
+                    return e
+                })
+                .then((result) => {
+                    if (result instanceof Error || !result) return result
+
+                    let pushed
+                    if (!result.done) {
+                        pushing = false
+                        pushed = pushToStream(result.value)
+                    }
+                    return {
+                        readyForMore: pushed || false,
+                        streamDone: result.done,
+                    }
+                })
         }
     }
 
     async getNextChunk() {
         let scanning_chunk = await this.getNextAttachment()
-        console.log(this.id, "Next chunk requested; got attachment", scanning_chunk)
+        console.log(
+            this.id,
+            "Next chunk requested; got attachment",
+            scanning_chunk
+        )
         if (!scanning_chunk) return null
 
-        let {
-            byteStart, byteEnd, scan_files_begin, scan_files_end
-        } = this.ranges
+        let { byteStart, byteEnd, scan_files_begin, scan_files_end } =
+            this.ranges
 
-        let headers: HeadersInit =
-            this.ranges.useRanges
-                ? {
-                    Range: `bytes=${
-                        this.position == 0
-                            ? byteStart - scan_files_begin * this.pointer.chunkSize!
-                            : "0"
-                    }-${
-                        this.attachmentBuffer.length == 0 && this.msgIdx == scan_files_end
-                            ? byteEnd - scan_files_end * this.pointer.chunkSize!
-                            : ""
-                    }`,
-                  }
-                : {}
+        let headers: HeadersInit = this.ranges.useRanges
+            ? {
+                  Range: `bytes=${
+                      this.position == 0
+                          ? byteStart -
+                            scan_files_begin * this.pointer.chunkSize!
+                          : "0"
+                  }-${
+                      this.attachmentBuffer.length == 0 &&
+                      this.msgIdx == scan_files_end
+                          ? byteEnd - scan_files_end * this.pointer.chunkSize!
+                          : ""
+                  }`,
+              }
+            : {}
 
         this.aborter = new AbortController()
 
-        let response = await fetch(scanning_chunk.url, {headers, signal: this.aborter.signal})
-            .catch((e: Error) => {
-                console.error(e)
-                return {body: e}
-            })
+        let response = await fetch(scanning_chunk.url, {
+            headers,
+            signal: this.aborter.signal,
+        }).catch((e: Error) => {
+            console.error(e)
+            return { body: e }
+        })
 
         this.position++
-        
+
         return response.body
     }
 
-    currentPusher?: (() => Promise<{readyForMore: boolean, streamDone: boolean } | void> | undefined)
+    currentPusher?: () =>
+        | Promise<{ readyForMore: boolean; streamDone: boolean } | void>
+        | undefined
     busy: boolean = false
 
     async pushData(): Promise<boolean | undefined> {
-
         // uh oh, we don't have a currentPusher
         // let's make one then
         if (!this.currentPusher) {
@@ -292,7 +326,8 @@ export class ReadStream extends Readable {
                 // or the stream has ended.
                 // let's destroy the stream
                 console.log(this.id, "Ending", next)
-                if (next) this.destroy(next); else this.push(null)
+                if (next) this.destroy(next)
+                else this.push(null)
                 return
             }
         }
@@ -304,12 +339,10 @@ export class ReadStream extends Readable {
             this.currentPusher = undefined
             return this.pushData()
         } else return result?.readyForMore
-
     }
 }
 
 export class UploadStream extends Writable {
-
     uploadId?: string
     name?: string
     mime?: string
@@ -331,7 +364,11 @@ export class UploadStream extends Writable {
 
     async _write(data: Buffer, encoding: string, callback: () => void) {
         console.log("Write to stream attempted")
-        if (this.filled + data.byteLength > (this.files.config.maxDiscordFileSize*this.files.config.maxDiscordFiles))
+        if (
+            this.filled + data.byteLength >
+            this.files.config.maxDiscordFileSize *
+                this.files.config.maxDiscordFiles
+        )
             return this.destroy(new WebError(413, "maximum file size exceeded"))
 
         this.hash.update(data)
@@ -343,21 +380,30 @@ export class UploadStream extends Writable {
 
         while (position < data.byteLength) {
             let capture = Math.min(
-                ((this.files.config.maxDiscordFileSize*10) - (this.filled % (this.files.config.maxDiscordFileSize*10))), 
-                data.byteLength-position
+                this.files.config.maxDiscordFileSize * 10 -
+                    (this.filled % (this.files.config.maxDiscordFileSize * 10)),
+                data.byteLength - position
             )
-            console.log(`Capturing ${capture} bytes for megachunk, ${data.subarray(position, position + capture).byteLength}`)
+            console.log(
+                `Capturing ${capture} bytes for megachunk, ${data.subarray(position, position + capture).byteLength}`
+            )
             if (!this.current) await this.getNextStream()
             if (!this.current) {
-                this.destroy(new Error("getNextStream called during debounce")); return
+                this.destroy(new Error("getNextStream called during debounce"))
+                return
             }
 
-            readyForMore = this.current.push( data.subarray(position, position+capture) )
-            console.log(`pushed ${data.byteLength} byte chunk`);
-            position += capture, this.filled += capture
+            readyForMore = this.current.push(
+                data.subarray(position, position + capture)
+            )
+            console.log(`pushed ${data.byteLength} byte chunk`)
+            ;(position += capture), (this.filled += capture)
 
             // message is full, so tell the next run to get a new message
-            if (this.filled % (this.files.config.maxDiscordFileSize*10) == 0) {
+            if (
+                this.filled % (this.files.config.maxDiscordFileSize * 10) ==
+                0
+            ) {
                 this.current!.push(null)
                 this.current = undefined
             }
@@ -369,24 +415,27 @@ export class UploadStream extends Writable {
 
     async _final(callback: (error?: Error | null | undefined) => void) {
         if (this.current) {
-            this.current.push(null);
+            this.current.push(null)
             // i probably dnt need this but whateverrr :3
-            await new Promise((res,rej) => this.once("debounceReleased", res))
+            await new Promise((res, rej) => this.once("debounceReleased", res))
         }
         callback()
     }
 
     aborted: boolean = false
 
-    async _destroy(error: Error | null, callback: (err?: Error|null) => void) {
+    async _destroy(
+        error: Error | null,
+        callback: (err?: Error | null) => void
+    ) {
         this.error = error || undefined
         await this.abort()
         callback(error)
     }
 
-    /** 
+    /**
      * @description Cancel & unlock the file. When destroy() is called with a non-WebError, this is automatically called
-    */
+     */
     async abort() {
         if (this.aborted) return
         this.aborted = true
@@ -406,8 +455,13 @@ export class UploadStream extends Writable {
     async commit() {
         if (this.errored) throw this.error
         if (!this.writableFinished) {
-            let err = Error("attempted to commit file when the stream was still unfinished")
-            if (!this.destroyed) {this.destroy(err)}; throw err
+            let err = Error(
+                "attempted to commit file when the stream was still unfinished"
+            )
+            if (!this.destroyed) {
+                this.destroy(err)
+            }
+            throw err
         }
 
         // Perform checks
@@ -421,7 +475,7 @@ export class UploadStream extends Writable {
         }
 
         if (!this.uploadId) this.setUploadId(generateFileId())
-        
+
         let ogf = this.files.files[this.uploadId!]
 
         this.files.files[this.uploadId!] = {
@@ -430,19 +484,18 @@ export class UploadStream extends Writable {
             messageids: this.messages,
             owner: this.owner,
             sizeInBytes: this.filled,
-            visibility: ogf ? ogf.visibility
-            : (
-                this.owner 
-                ? Accounts.getFromId(this.owner)?.defaultFileVisibility 
-                : undefined
-            ),
+            visibility: ogf
+                ? ogf.visibility
+                : this.owner
+                  ? Accounts.getFromId(this.owner)?.defaultFileVisibility
+                  : undefined,
             // so that json.stringify doesnt include tag:undefined
-            ...((ogf||{}).tag ? {tag:ogf.tag} : {}),
+            ...((ogf || {}).tag ? { tag: ogf.tag } : {}),
 
             chunkSize: this.files.config.maxDiscordFileSize,
 
             md5: this.hash.digest("hex"),
-            lastModified: Date.now()
+            lastModified: Date.now(),
         }
 
         delete this.files.locks[this.uploadId!]
@@ -456,52 +509,72 @@ export class UploadStream extends Writable {
 
     setName(name: string) {
         if (this.name)
-            return this.destroy( new WebError(400, "duplicate attempt to set filename") )
+            return this.destroy(
+                new WebError(400, "duplicate attempt to set filename")
+            )
         if (name.length > 512)
-            return this.destroy( new WebError(400, "filename can be a maximum of 512 characters") )
-        
-        this.name = name;
+            return this.destroy(
+                new WebError(400, "filename can be a maximum of 512 characters")
+            )
+
+        this.name = name
         return this
     }
 
-    setType(type: string) { 
+    setType(type: string) {
         if (this.mime)
-            return this.destroy( new WebError(400, "duplicate attempt to set mime type") )
+            return this.destroy(
+                new WebError(400, "duplicate attempt to set mime type")
+            )
         if (type.length > 256)
-            return this.destroy( new WebError(400, "mime type can be a maximum of 256 characters") )
-        
-        this.mime = type;
+            return this.destroy(
+                new WebError(
+                    400,
+                    "mime type can be a maximum of 256 characters"
+                )
+            )
+
+        this.mime = type
         return this
     }
 
     setUploadId(id: string) {
         if (this.uploadId)
-            return this.destroy( new WebError(400, "duplicate attempt to set upload ID") )
-        if (!id || id.match(id_check_regex)?.[0] != id
-            || id.length > this.files.config.maxUploadIdLength)
-            return this.destroy( new WebError(400, "invalid file ID") )
+            return this.destroy(
+                new WebError(400, "duplicate attempt to set upload ID")
+            )
+        if (
+            !id ||
+            id.match(id_check_regex)?.[0] != id ||
+            id.length > this.files.config.maxUploadIdLength
+        )
+            return this.destroy(new WebError(400, "invalid file ID"))
 
         if (this.files.files[id] && this.files.files[id].owner != this.owner)
-            return this.destroy( new WebError(403, "you don't own this file") )
+            return this.destroy(new WebError(403, "you don't own this file"))
 
         if (this.files.locks[id])
-            return this.destroy( new WebError(409, "a file with this ID is already being uploaded") )
+            return this.destroy(
+                new WebError(
+                    409,
+                    "a file with this ID is already being uploaded"
+                )
+            )
 
         this.files.locks[id] = true
         this.uploadId = id
         return this
-    } 
+    }
 
     // merged StreamBuffer helper
-    
+
     filled: number = 0
     current?: Readable
     messages: string[] = []
-    
-    private newmessage_debounce : boolean = true
-    
-    private async startMessage(): Promise<Readable | undefined> {
 
+    private newmessage_debounce: boolean = true
+
+    private async startMessage(): Promise<Readable | undefined> {
         if (!this.newmessage_debounce) return
         this.newmessage_debounce = false
 
@@ -510,24 +583,28 @@ export class UploadStream extends Writable {
         let stream = new Readable({
             read() {
                 // this is stupid but it should work
-                console.log("Read called; calling on server to execute callback")
+                console.log(
+                    "Read called; calling on server to execute callback"
+                )
                 wrt.emit("exec-callback")
-            }
+            },
         })
         stream.pause()
-        
+
         console.log(`Starting a message`)
-        this.files.api.send(stream).then(message => {
-            this.messages.push(message.id)
-            console.log(`Sent: ${message.id}`)
-            this.newmessage_debounce = true
-            this.emit("debounceReleased")
-        }).catch(e => {
-            if (!this.errored) this.destroy(e)
-        })
+        this.files.api
+            .send(stream)
+            .then((message) => {
+                this.messages.push(message.id)
+                console.log(`Sent: ${message.id}`)
+                this.newmessage_debounce = true
+                this.emit("debounceReleased")
+            })
+            .catch((e) => {
+                if (!this.errored) this.destroy(e)
+            })
 
         return stream
-        
     }
 
     private async getNextStream() {
@@ -536,12 +613,14 @@ export class UploadStream extends Writable {
         if (this.current) return this.current
         else if (this.newmessage_debounce) {
             // startmessage.... idk
-            this.current = await this.startMessage();
+            this.current = await this.startMessage()
             return this.current
         } else {
             return new Promise((resolve, reject) => {
                 console.log("Waiting for debounce to be released...")
-                this.once("debounceReleased", async () => resolve(await this.getNextStream()))
+                this.once("debounceReleased", async () =>
+                    resolve(await this.getNextStream())
+                )
             })
         }
     }
@@ -553,13 +632,13 @@ export default class Files {
     files: { [key: string]: FilePointer } = {}
     data_directory: string = `${process.cwd()}/.data`
 
-    locks: Record<string, boolean> = {} // I'll, like, do something more proper later 
+    locks: Record<string, boolean> = {} // I'll, like, do something more proper later
 
     constructor(config: Configuration) {
         this.config = config
-        this.api = new API(process.env.TOKEN!, config)
+        this.api = new API(config.discordToken!, config)
 
-        readFile(this.data_directory+ "/files.json")
+        readFile(this.data_directory + "/files.json")
             .then((buf) => {
                 this.files = JSON.parse(buf.toString() || "{}")
             })
@@ -574,7 +653,7 @@ export default class Files {
 
     /**
      * @description Saves file database
-     * 
+     *
      */
     async write(): Promise<void> {
         await writeFile(
@@ -592,7 +671,7 @@ export default class Files {
      * @param uploadId Target file's ID
      */
 
-    async update( uploadId: string ) {
+    async update(uploadId: string) {
         let target_file = this.files[uploadId]
         let attachment_sizes = []
 
@@ -604,12 +683,12 @@ export default class Files {
         }
 
         if (!target_file.sizeInBytes)
-            target_file.sizeInBytes = attachment_sizes.reduce((a, b) => a + b, 0) 
-        
-        if (!target_file.chunkSize)
-            target_file.chunkSize = attachment_sizes[0]
+            target_file.sizeInBytes = attachment_sizes.reduce(
+                (a, b) => a + b,
+                0
+            )
 
-        
+        if (!target_file.chunkSize) target_file.chunkSize = attachment_sizes[0]
     }
 
     /**
@@ -624,7 +703,8 @@ export default class Files {
     ): Promise<ReadStream> {
         if (this.files[uploadId]) {
             let file = this.files[uploadId]
-            if (!file.sizeInBytes || !file.chunkSize) await this.update(uploadId)
+            if (!file.sizeInBytes || !file.chunkSize)
+                await this.update(uploadId)
             return new ReadStream(this, file, range)
         } else {
             throw { status: 404, message: "not found" }
@@ -648,9 +728,9 @@ export default class Files {
         }
         delete this.files[uploadId]
 
-        if (!noWrite) this.write().catch((err) => {
-            throw err
-        })
+        if (!noWrite)
+            this.write().catch((err) => {
+                throw err
+            })
     }
-
 }
