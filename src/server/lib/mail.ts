@@ -1,16 +1,18 @@
 import { createTransport } from "nodemailer"
-import "dotenv/config"
-import config from "../../../config.json" assert {type:"json"}
+import config from "./config.js"
 import { generateFileId } from "./files.js"
 
-let mailConfig = config.mail,
-    transport = createTransport({
-        ...mailConfig.transport,
-        auth: {
-            user: process.env.MAIL_USER,
-            pass: process.env.MAIL_PASS,
-        },
-    })
+const { mail } = config
+const transport = createTransport({
+    host: mail.transport.host,
+    port: mail.transport.port,
+    secure: mail.transport.secure,
+    from: mail.send.from,
+    auth: {
+        user: mail.user,
+        pass: mail.pass,
+    },
+})
 
 /**
  * @description Sends an email
@@ -23,7 +25,6 @@ export function sendMail(to: string, subject: string, content: string) {
     return transport.sendMail({
         to,
         subject,
-        from: mailConfig.send.from,
         html: `<span style="font-size:x-large;font-weight:600;">monofile <span style="opacity:0.5">accounts</span></span><br><span style="opacity:0.5">Gain control of your uploads.</span><hr><br>${content
             .replaceAll(
                 "<span username>",
@@ -37,25 +38,30 @@ export function sendMail(to: string, subject: string, content: string) {
 }
 
 export namespace CodeMgr {
+    export const Intents = ["verifyEmail", "recoverAccount"] as const
 
-    export const Intents = [
-        "verifyEmail",
-        "recoverAccount"
-    ] as const
+    export type Intent = (typeof Intents)[number]
 
-    export type Intent = typeof Intents[number]
-
-    export function isIntent(intent: string): intent is Intent { return intent in Intents } 
+    export function isIntent(intent: string): intent is Intent {
+        return intent in Intents
+    }
 
     export let codes = Object.fromEntries(
-        Intents.map(e => [
-            e, 
-            {byId: new Map<string, Code>(), byUser: new Map<string, Code[]>()}
-        ])) as Record<Intent, { byId: Map<string, Code>, byUser: Map<string, Code[]> }>
+        Intents.map((e) => [
+            e,
+            {
+                byId: new Map<string, Code>(),
+                byUser: new Map<string, Code[]>(),
+            },
+        ])
+    ) as Record<
+        Intent,
+        { byId: Map<string, Code>; byUser: Map<string, Code[]> }
+    >
 
     // this is stupid whyd i write this
 
-    export class Code { 
+    export class Code {
         readonly id: string = generateFileId(12)
         readonly for: string
 
@@ -65,25 +71,30 @@ export namespace CodeMgr {
 
         readonly data: any
 
-        constructor(intent: Intent, forUser: string, data?: any, time: number = 15*60*1000) {
-            this.for = forUser;
+        constructor(
+            intent: Intent,
+            forUser: string,
+            data?: any,
+            time: number = 15 * 60 * 1000
+        ) {
+            this.for = forUser
             this.intent = intent
             this.expiryClear = setTimeout(this.terminate.bind(this), time)
             this.data = data
 
-            codes[intent].byId.set(this.id, this);
+            codes[intent].byId.set(this.id, this)
 
             let byUser = codes[intent].byUser.get(this.for)
             if (!byUser) {
                 byUser = []
-                codes[intent].byUser.set(this.for, byUser);
+                codes[intent].byUser.set(this.for, byUser)
             }
 
             byUser.push(this)
         }
 
         terminate() {
-            codes[this.intent].byId.delete(this.id);
+            codes[this.intent].byId.delete(this.id)
             let bu = codes[this.intent].byUser.get(this.id)!
             bu.splice(bu.indexOf(this), 1)
             clearTimeout(this.expiryClear)
@@ -93,5 +104,4 @@ export namespace CodeMgr {
             return forUser === this.for
         }
     }
-
 }

@@ -1,0 +1,11 @@
+.vscode
+.gitignore
+.prettierrc
+LICENSE
+README.md
+node_modules
+.env
+.data
+out
+dist
+tsconfig.tsbuildinfo

@@ -10,7 +10,7 @@ import {
     requiresPermissions,
 } from "../../../lib/middleware.js"
 import { accountRatelimit } from "../../../lib/ratelimit.js"
-
+import config from "../../../lib/config.js"
 import ServeError from "../../../lib/errors.js"
 import Files, {
     FileVisibility,
@@ -26,7 +26,6 @@ export let authRoutes = new Hono<{
     }
 }>()
 
-import config from "../../../../../config.json" assert {type:"json"}
 authRoutes.all("*", getAccount)
 
 export default function (files: Files) {
@@ -417,10 +416,13 @@ export default function (files: Files) {
 
         pwReset.set(acc.id, {
             code,
-            expiry: setTimeout(() => {
-                pwReset.delete(acc?.id || "")
-                prcIdx.delete(pResetCode?.code || "")
-            }, 15 * 60 * 1000),
+            expiry: setTimeout(
+                () => {
+                    pwReset.delete(acc?.id || "")
+                    prcIdx.delete(pResetCode?.code || "")
+                },
+                15 * 60 * 1000
+            ),
             requestedAt: Date.now(),
         })
 

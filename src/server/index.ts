@@ -7,10 +7,10 @@ import Files from "./lib/files.js"
 import { getAccount } from "./lib/middleware.js"
 import APIRouter from "./routes/api.js"
 import preview from "./routes/api/web/preview.js"
-import {fileURLToPath} from "url"
-import {dirname} from "path"
-import pkg from "../../package.json" assert {type:"json"}
-import config from "../../config.json" assert {type:"json"}
+import { fileURLToPath } from "url"
+import { dirname } from "path"
+import pkg from "../../package.json" assert { type: "json" }
+import config, { ClientConfiguration } from "./lib/config.js"
 
 const app = new Hono()
 
@@ -36,10 +36,8 @@ app.get(
 // haha...
 
 app.on(["MOLLER"], "*", async (ctx) => {
-
     ctx.header("Content-Type", "image/webp")
-    return ctx.body( await readFile("./assets/moller.png") )
-    
+    return ctx.body(await readFile("./assets/moller.png"))
 })
 
 //app.use(bodyParser.text({limit:(config.maxDiscordFileSize*config.maxDiscordFiles)+1048576,type:["application/json","text/plain"]}))
@@ -64,10 +62,12 @@ if (config.forceSSL) {
 
 app.get("/server", (ctx) =>
     ctx.json({
-        ...config,
         version: pkg.version,
         files: Object.keys(files.files).length,
-    })
+        maxDiscordFiles: config.maxDiscordFiles,
+        maxDiscordFileSize: config.maxDiscordFileSize,
+        accounts: config.accounts,
+    } as ClientConfiguration)
 )
 
 // funcs
@@ -87,28 +87,30 @@ apiRouter.loadAPIMethods().then(() => {
     console.log("API OK!")
 
     // moved here to ensure it's matched last
-    app.get("/:fileId", async (ctx) => 
+    app.get("/:fileId", async (ctx) =>
         app.fetch(
             new Request(
-                (new URL(
-                    `/api/v1/file/${ctx.req.param("fileId")}`, ctx.req.raw.url)).href, 
-                    ctx.req.raw
-            ), 
+                new URL(
+                    `/api/v1/file/${ctx.req.param("fileId")}`,
+                    ctx.req.raw.url
+                ).href,
+                ctx.req.raw
+            ),
             ctx.env
         )
     )
 
-    // listen on 3000 or MONOFILE_PORT
+    // listen on 3000 or PORT
     // moved here to prevent a crash if someone manages to access monofile before api routes are mounted
-    
+
     serve(
         {
             fetch: app.fetch,
-            port: Number(process.env.MONOFILE_PORT || 3000),
+            port: Number(process.env.PORT || 3000),
             serverOptions: {
                 //@ts-ignore
-                requestTimeout: config.requestTimeout
-            }
+                requestTimeout: config.requestTimeout,
+            },
         },
         (info) => {
             console.log("Web OK!", info.port, info.address)

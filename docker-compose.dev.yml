@@ -1,0 +1,10 @@
+services:
+    monofile:
+        container_name: "monofile"
+        image: monofile
+        build: .
+        env_file: .env
+        volumes:
+            - ".data:/usr/src/app/.data"
+        ports:
+            - "3000:3000"
