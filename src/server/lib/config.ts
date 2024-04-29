@@ -45,7 +45,7 @@ export default {
     requestTimeout: Number(process.env.REQUEST_TIMEOUT),
     trustProxy: process.env.TRUST_PROXY === "true",
     forceSSL: process.env.FORCE_SSL === "true",
-    discordToken: process.env.DISCORD__TOKEN,
+    discordToken: process.env.DISCORD_TOKEN,
     maxDiscordFiles: Number(process.env.MAX__DISCORD_FILES),
     maxDiscordFileSize: Number(process.env.MAX__DISCORD_FILE_SIZE),
     maxUploadIdLength: Number(process.env.MAX__UPLOAD_ID_LENGTH),
