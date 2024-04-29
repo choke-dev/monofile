@@ -90,8 +90,7 @@ export default function (files: Files) {
         let acc = Accounts.getFromUsername(body.username)
 
         if (acc) {
-            ServeError(ctx, 400, "account with this username already exists")
-            return
+            return ServeError(ctx, 400, "account with this username already exists")
         }
 
         if (body.username.length < 3 || body.username.length > 20) {
@@ -109,8 +108,7 @@ export default function (files: Files) {
         }
 
         if (body.password.length < 8) {
-            ServeError(ctx, 400, "password must be 8 characters or longer")
-            return
+            return ServeError(ctx, 400, "password must be 8 characters or longer")
         }
 
         return Accounts.create(body.username, body.password)
