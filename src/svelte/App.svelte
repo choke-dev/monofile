@@ -1,4 +1,6 @@
 <script lang="ts">
 </script>
 
-<div id="appContent"></div>
+<div id="appContent">
+    
+</div>
