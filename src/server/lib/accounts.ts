@@ -2,12 +2,14 @@ import crypto from "crypto"
 import * as auth from "./auth.js";
 import { readFile, writeFile } from "fs/promises"
 import { FileVisibility } from "./files.js";
+import { AccountSchemas } from "./schemas/index.js";
+import { z } from "zod"
 
 // this is probably horrible
 // but i don't even care anymore
 
 export let Accounts: Account[] = []
-
+/*
 export interface Account {
     id                    : string
     username              : string
@@ -25,7 +27,9 @@ export interface Account {
         color?            : string
         largeImage?       : boolean
     }
-}
+}*/
+
+export type Account = z.infer<typeof AccountSchemas.Account>
 
 /**
  * @description Create a new account.
@@ -45,7 +49,8 @@ export async function create(username:string,pwd:string,admin:boolean=false):Pro
             password: password.hash(pwd),
             files: [],
             admin: admin,
-            defaultFileVisibility: "public"
+            defaultFileVisibility: "public",
+            settings: AccountSchemas.Settings.User.parse({})
         }
     )
 

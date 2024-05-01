@@ -75,18 +75,18 @@ export default function (files: Files) {
                                 <meta property="og:video:height" content="720">`
                                   : "")
                             : "") +
-                            (fileOwner?.embed?.largeImage &&
+                            (fileOwner?.settings?.links?.largeImage &&
                             file.visibility != "anonymous" &&
                             file.mime.startsWith("image/")
                                 ? `<meta name="twitter:card" content="summary_large_image">`
                                 : "") +
                             `\n<meta name="theme-color" content="${
-                                fileOwner?.embed?.color &&
+                                fileOwner?.settings?.links.color &&
                                 file.visibility != "anonymous" &&
                                 (ctx.req.header("user-agent") || "").includes(
                                     "Discordbot"
                                 )
-                                    ? `#${fileOwner.embed.color}`
+                                    ? `#${fileOwner?.settings?.links.color}`
                                     : "rgb(30, 33, 36)"
                             }">`
                     )

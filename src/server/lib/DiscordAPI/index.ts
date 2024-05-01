@@ -7,7 +7,7 @@ import type { Configuration } from "../config.js"
 const EXPIRE_AFTER = 20 * 60 * 1000
 const DISCORD_EPOCH = 1420070400000
 // Converts a snowflake ID string into a JS Date object using the provided epoch (in ms), or Discord's epoch if not provided
-function convertSnowflakeToDate(
+export function convertSnowflakeToDate(
     snowflake: string | number,
     epoch = DISCORD_EPOCH
 ) {

@@ -2,7 +2,7 @@ import { readFile, writeFile } from "node:fs/promises"
 import { Readable, Writable } from "node:stream"
 import crypto from "node:crypto"
 import { files } from "./accounts.js"
-import { Client as API } from "./DiscordAPI/index.js"
+import { Client as API, convertSnowflakeToDate } from "./DiscordAPI/index.js"
 import type { APIAttachment } from "discord-api-types/v10"
 import config, { Configuration } from "./config.js"
 import "dotenv/config"
@@ -624,28 +624,37 @@ export default class Files {
     }
 
     /**
-     * @description Update a file from monofile 1.2 to allow for range requests with Content-Length to that file.
+     * @description Update a file from monofile 1.x to 2.x
      * @param uploadId Target file's ID
      */
 
     async update(uploadId: string) {
         let target_file = this.files[uploadId]
-        let attachment_sizes = []
+        let attachments: APIAttachment[] = []
 
         for (let message of target_file.messageids) {
             let attachments = (await this.api.fetchMessage(message)).attachments
             for (let attachment of attachments) {
-                attachment_sizes.push(attachment.size)
+                attachments.push(attachment)
             }
         }
 
         if (!target_file.sizeInBytes)
-            target_file.sizeInBytes = attachment_sizes.reduce(
-                (a, b) => a + b,
+            target_file.sizeInBytes = attachments.reduce(
+                (a, b) => a + b.size,
                 0
             )
 
-        if (!target_file.chunkSize) target_file.chunkSize = attachment_sizes[0]
+        if (!target_file.chunkSize) target_file.chunkSize = attachments[0].size
+
+        if (!target_file.lastModified) target_file.lastModified = convertSnowflakeToDate(target_file.messageids[target_file.messageids.length-1]).getTime()
+
+        // this feels like needlessly heavy
+        // we should probably just do this in an actual readFile idk
+        if (!target_file.md5) {
+            let hash = crypto.createHash("md5");
+            (await this.readFileStream(uploadId)).pipe(hash).once("end", () => target_file.md5 = hash.digest("hex"))
+        }
     }
 
     /**

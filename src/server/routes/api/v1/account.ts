@@ -81,7 +81,7 @@ const validators: {
         }
     },
     email: {
-        schema: AccountSchemas.Account.shape.email.optional(),
+        schema: AccountSchemas.Account.shape.email.nullable(),
         validator: (actor, target, params, ctx) => {
             if (
                 !params.currentPassword || // actor on purpose here to allow admins
@@ -191,6 +191,23 @@ const validators: {
             else return [400, "cannot demote an admin"]
         }
     },
+    settings: {
+        schema: AccountSchemas.Settings.User.partial(),
+        validator: (actor, target, params) => {
+            let base = AccountSchemas.Settings.User.default({}).parse(target.settings)
+
+            let visit = (bse: Record<string, any>, nw: Record<string, any>) => {
+                for (let [key,value] of Object.entries(nw)) {
+                    if (typeof value == "object") visit(bse[key], value)
+                    else bse[key] = value
+                }
+            }
+
+            visit(base, params.settings)
+            
+            return AccountSchemas.Settings.User.parse(base) // so that toLowerCase is called again... yeah that's it
+        }
+    },
 }
 
 router.use(getAccount)
@@ -246,8 +263,9 @@ export default function (files: Files) {
                 login(ctx, account)
                 return ctx.text("logged in")
             })
-            .catch(() => {
-                return ServeError(ctx, 500, "internal server error")
+            .catch((e) => {
+                console.error(e)
+                return ServeError(ctx, 500, e instanceof z.ZodError ? issuesToMessage(e.issues) : "internal server error")
             })
     })
 
@@ -352,12 +370,6 @@ export default function (files: Files) {
                     (e.expire > Date.now() || !e.expire)
             ).length,
         })
-    })
-
-    router.get("/:user/css", async (ctx) => {
-        let acc = ctx.get("account")
-        if (acc?.customCSS) return ctx.redirect(`/file/${acc.customCSS}`)
-        else return ctx.text("")
     })
 
     return router
