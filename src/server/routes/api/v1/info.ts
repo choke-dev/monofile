@@ -21,7 +21,8 @@ export default function(files: Files) {
             totalSize: Object.values(files.files).filter(e => e.sizeInBytes).reduce((acc,cur)=>acc+cur.sizeInBytes!,0),
             maxDiscordFiles: config.maxDiscordFiles,
             maxDiscordFileSize: config.maxDiscordFileSize,
-            accounts: config.accounts
+            accounts: config.accounts,
+            mailEnabled: config.mail.enabled
         } as ClientConfiguration)
     )
 

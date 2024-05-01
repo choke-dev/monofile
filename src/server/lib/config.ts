@@ -15,6 +15,7 @@ export interface Configuration {
         requiredForUpload: boolean
     }
     mail: {
+        enabled: boolean
         transport: {
             host: string
             port: number
@@ -31,6 +32,8 @@ export interface Configuration {
 export interface ClientConfiguration {
     version: string
     files: number
+    totalSize: number
+    mailEnabled: boolean
     maxDiscordFiles: number
     maxDiscordFileSize: number
     accounts: {
@@ -56,6 +59,8 @@ export default {
     },
 
     mail: {
+        enabled: ["HOST","PORT","SEND_FROM","USER","PASS"].every(e => Boolean(process.env[`MAIL__${e}`])),
+
         transport: {
             host: process.env.MAIL__HOST,
             port: Number(process.env.MAIL__PORT),
