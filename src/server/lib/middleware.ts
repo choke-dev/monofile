@@ -3,7 +3,7 @@ import type { Context, Handler as RequestHandler } from "hono"
 import ServeError from "../lib/errors.js"
 import * as auth from "./auth.js"
 import { setCookie } from "hono/cookie"
-import { ZodObject } from "zod"
+import { z } from "zod"
 
 /**
  * @description Middleware which adds an account, if any, to ctx.get("account")
@@ -38,7 +38,6 @@ export const requiresAdmin: RequestHandler = function (ctx, next) {
  * @param tokenPermissions Permissions which your route requires.
  * @returns Express middleware
  */
-
 export const requiresPermissions = function (
     ...tokenPermissions: auth.TokenPermission[]
 ): RequestHandler {
@@ -94,6 +93,18 @@ export const assertAPI = function (
     }
 }
 
+export const issuesToMessage = function(issues: z.ZodIssue[]) {
+    return issues.map(e => `${e.path}: ${e.code} :: ${e.message}`).join("; ")
+}
+
+export const scheme = function(scheme: z.ZodTypeAny): RequestHandler {
+    return async function(ctx, next) {
+        let chk = scheme.safeParse(await ctx.req.json())
+        if (chk.success) return next()
+        else return ServeError(ctx, 400, issuesToMessage(chk.error.issues))
+    }
+}
+
 // Not really middleware but a utility
 
 export const login = (ctx: Context, account: string) => setCookie(ctx, "auth", auth.create(account, 3 * 24 * 60 * 60 * 1000), {
@@ -102,11 +113,3 @@ export const login = (ctx: Context, account: string) => setCookie(ctx, "auth", a
     secure: true,
     httpOnly: true
 })
-
-export const scheme = function(scheme: ZodObject<any>): RequestHandler {
-    return function(ctx, next) {
-        let chk = scheme.safeParse(ctx.req.json())
-        if (chk.success) next()
-        else ServeError(ctx, 400, chk.error.message)
-    }
-}

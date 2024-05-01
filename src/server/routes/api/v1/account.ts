@@ -11,6 +11,7 @@ import * as auth from "../../../lib/auth.js"
 import {
     assertAPI,
     getAccount,
+    issuesToMessage,
     login,
     noAPIAccess,
     requiresAccount,
@@ -43,8 +44,7 @@ type Message = [200 | 400 | 401 | 403 | 429 | 501, string]
 // @Jack5079 make typings better if possible
 
 type Validator<
-    T extends keyof Partial<Accounts.Account>,
-    ValueNotNull extends boolean,
+    T extends keyof Partial<Accounts.Account>
 > =
     /**
      * @param actor The account performing this action
@@ -55,38 +55,33 @@ type Validator<
         actor: Accounts.Account,
         target: Accounts.Account,
         params: UserUpdateParameters &
-            (ValueNotNull extends true
-                ? {
-                      [K in keyof Pick<
-                          UserUpdateParameters,
-                          T
-                      >]-?: UserUpdateParameters[K]
-                  }
-                : {}),
+            {
+                [K in keyof Pick<
+                    UserUpdateParameters,
+                    T
+                >]-?: UserUpdateParameters[K]
+            },
         ctx: Context
     ) => Accounts.Account[T] | Message
 
-// this type is so stupid stg
-type ValidatorWithSettings<T extends keyof Partial<Accounts.Account>> =
-    | {
-          acceptsNull: true
-          validator: Validator<T, false>
-      }
-    | {
-          acceptsNull?: false
-          validator: Validator<T, true>
-      }
+type SchemedValidator<
+    T extends keyof Partial<Accounts.Account>
+> = {
+    validator: Validator<T>,
+    schema: z.ZodTypeAny
+}
 
 const validators: {
-    [T in keyof Partial<Accounts.Account>]:
-        | Validator<T, true>
-        | ValidatorWithSettings<T>
+    [T in keyof Partial<Accounts.Account>]: SchemedValidator<T>
 } = {
-    defaultFileVisibility(actor, target, params) {
-        return params.defaultFileVisibility
+    defaultFileVisibility: {
+        schema: FileSchemas.FileVisibility,
+        validator: (actor, target, params) => {
+            return params.defaultFileVisibility
+        }
     },
     email: {
-        acceptsNull: true,
+        schema: AccountSchemas.Account.shape.email.optional(),
         validator: (actor, target, params, ctx) => {
             if (
                 !params.currentPassword || // actor on purpose here to allow admins
@@ -139,82 +134,62 @@ const validators: {
             return [200, "please check your inbox"]
         },
     },
-    password(actor, target, params) {
-        if (
-            !params.currentPassword || // actor on purpose here to allow admins
-            (params.currentPassword &&
-                Accounts.password.check(actor.id, params.currentPassword))
-        )
-            return [401, "current password incorrect"]
-
-        if (target.email) {
-            sendMail(
-                target.email,
-                `Your login details have been updated`,
-                `<b>Hello there!</b> Your password on your account, <span username>${target.username}</span>, has been updated` +
-                    `${actor != target ? ` by <span username>${actor.username}</span>` : ""}. ` +
-                    `Please update your saved login details accordingly.`
-            ).catch()
-        }
-
-        return Accounts.password.hash(params.password)
-    },
-    username(actor, target, params) {
-        if (
-            !params.currentPassword || // actor on purpose here to allow admins
-            (params.currentPassword &&
-                Accounts.password.check(actor.id, params.currentPassword))
-        )
-            return [401, "current password incorrect"]
-
-        if (Accounts.getFromUsername(params.username))
-            return [400, "account with this username already exists"]
-
-        if (target.email) {
-            sendMail(
-                target.email,
-                `Your login details have been updated`,
-                `<b>Hello there!</b> Your username on your account, <span username>${target.username}</span>, has been updated` +
-                    `${actor != target ? ` by <span username>${actor.username}</span>` : ""} to <span username>${params.username}</span>. ` +
-                    `Please update your saved login details accordingly.`
-            ).catch()
-        }
-
-        return params.username
-    },
-    customCSS: {
-        acceptsNull: true,
+    password: {
+        schema: AccountSchemas.StringPassword,
         validator: (actor, target, params) => {
-            if (FileSchemas.FileId.safeParse(params.customCSS).success)
-                return params.customCSS
-            else return [400, "bad file id"]
-        },
-    },
-    embed(actor, target, params) {
-        if (typeof params.embed !== "object")
-            return [400, "must use an object for embed"]
-        if (params.embed.color === undefined) {
-            params.embed.color = target.embed?.color
-        } else if (
-            !(
-                (params.embed.color.toLowerCase().match(/[a-f0-9]+/)?.[0] ==
-                    params.embed.color.toLowerCase() &&
-                    params.embed.color.length == 6) ||
-                params.embed.color == null
+            if (
+                !params.currentPassword || // actor on purpose here to allow admins
+                (params.currentPassword &&
+                    Accounts.password.check(actor.id, params.currentPassword))
             )
-        )
-            return [400, "bad embed color"]
+                return [401, "current password incorrect"]
 
-        if (params.embed.largeImage === undefined) {
-            params.embed.largeImage = target.embed?.largeImage
-        } else params.embed.largeImage = Boolean(params.embed.largeImage)
+            if (target.email) {
+                sendMail(
+                    target.email,
+                    `Your login details have been updated`,
+                    `<b>Hello there!</b> Your password on your account, <span username>${target.username}</span>, has been updated` +
+                        `${actor != target ? ` by <span username>${actor.username}</span>` : ""}. ` +
+                        `Please update your saved login details accordingly.`
+                ).catch()
+            }
 
-        return params.embed
+            return Accounts.password.hash(params.password)
+        }
     },
-    admin(actor, target, params) {
-        if (actor.admin && !target.admin) return params.admin
-        else if (!actor.admin) return [400, "cannot promote yourself"]
-        else return [400, "cannot demote an admin"]
+    username: {
+        schema: AccountSchemas.Username,
+        validator: (actor, target, params) => {
+            if (
+                !params.currentPassword || // actor on purpose here to allow admins
+                (params.currentPassword &&
+                    Accounts.password.check(actor.id, params.currentPassword))
+            )
+                return [401, "current password incorrect"]
+
+            if (Accounts.getFromUsername(params.username))
+                return [400, "account with this username already exists"]
+
+            if (target.email) {
+                sendMail(
+                    target.email,
+                    `Your login details have been updated`,
+                    `<b>Hello there!</b> Your username on your account, <span username>${target.username}</span>, has been updated` +
+                        `${actor != target ? ` by <span username>${actor.username}</span>` : ""} to <span username>${params.username}</span>. ` +
+                        `Please update your saved login details accordingly.`
+                ).catch()
+            }
+
+            return params.username
+        }
+    },
+    admin: {
+        schema: z.boolean(),
+        validator: (actor, target, params) => {
+            if (actor.admin && !target.admin) return params.admin
+            else if (!actor.admin) return [400, "cannot promote yourself"]
+            else return [400, "cannot demote an admin"]
+        }
     },
 }
 
@@ -306,23 +281,11 @@ export default function (files: Files) {
                         `the ${x} parameter cannot be set or is not a valid parameter`,
                     ] as Message
 
-                let validator = (
-                    typeof validators[x] == "object"
-                        ? validators[x]
-                        : {
-                              validator: validators[x] as Validator<
-                                  typeof x,
-                                  false
-                              >,
-                              acceptsNull: false,
-                          }
-                ) as ValidatorWithSettings<typeof x>
+                let validator = validators[x]!
 
-                if (!validator.acceptsNull && !v)
-                    return [
-                        400,
-                        `the ${x} validator does not accept null values`,
-                    ] as Message
+                let check = validator.schema.safeParse(v)
+                if (!check.success)
+                    return [400, issuesToMessage(check.error.issues)]
 
                 return [
                     x,
@@ -391,7 +354,7 @@ export default function (files: Files) {
         })
     })
 
-    router.get("/css", async (ctx) => {
+    router.get("/:user/css", async (ctx) => {
         let acc = ctx.get("account")
         if (acc?.customCSS) return ctx.redirect(`/file/${acc.customCSS}`)
         else return ctx.text("")

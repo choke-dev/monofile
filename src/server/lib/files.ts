@@ -10,6 +10,7 @@ import "dotenv/config"
 import * as Accounts from "./accounts.js"
 import { z } from "zod"
 import * as schemas from "./schemas/files.js"
+import { issuesToMessage } from "./middleware.js"
 
 export let alphanum = Array.from(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
@@ -504,7 +505,7 @@ export class UploadStream extends Writable {
         let check = schemas.FileId.safeParse(id);
 
         if (!check.success)
-            return this.destroy(new WebError(400, check.error.message))
+            return this.destroy(new WebError(400, issuesToMessage(check.error.issues)))
 
         if (this.files.files[id] && this.files.files[id].owner != this.owner)
             return this.destroy(new WebError(403, "you don't own this file"))
