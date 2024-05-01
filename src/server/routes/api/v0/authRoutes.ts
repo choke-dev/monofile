@@ -14,8 +14,7 @@ import config from "../../../lib/config.js"
 import ServeError from "../../../lib/errors.js"
 import Files, {
     FileVisibility,
-    generateFileId,
-    id_check_regex,
+    generateFileId
 } from "../../../lib/files.js"
 
 import { writeFile } from "fs/promises"

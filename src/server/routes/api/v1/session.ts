@@ -6,7 +6,7 @@ import { getCookie, setCookie } from "hono/cookie"
 
 // Libs
 
-import Files, { id_check_regex } from "../../../lib/files.js"
+import Files from "../../../lib/files.js"
 import * as Accounts from "../../../lib/accounts.js"
 import * as auth from "../../../lib/auth.js"
 import {

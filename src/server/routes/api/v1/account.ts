@@ -5,7 +5,7 @@ import { getCookie, setCookie } from "hono/cookie"
 
 // Libs
 
-import Files, { id_check_regex } from "../../../lib/files.js"
+import Files from "../../../lib/files.js"
 import * as Accounts from "../../../lib/accounts.js"
 import * as auth from "../../../lib/auth.js"
 import {
@@ -15,11 +15,14 @@ import {
     noAPIAccess,
     requiresAccount,
     requiresPermissions,
+    scheme,
 } from "../../../lib/middleware.js"
 import ServeError from "../../../lib/errors.js"
 import { CodeMgr, sendMail } from "../../../lib/mail.js"
 
 import Configuration from "../../../lib/config.js"
+import { AccountSchemas, FileSchemas } from "../../../lib/schemas/index.js"
+import { z } from "zod"
 
 const router = new Hono<{
     Variables: {
@@ -80,13 +83,7 @@ const validators: {
         | ValidatorWithSettings<T>
 } = {
     defaultFileVisibility(actor, target, params) {
-        if (
-            ["public", "private", "anonymous"].includes(
-                params.defaultFileVisibility
-            )
-        )
-            return params.defaultFileVisibility
-        else return [400, "invalid file visibility"]
+        return params.defaultFileVisibility
     },
     email: {
         acceptsNull: true,
@@ -109,8 +106,8 @@ const validators: {
                 return undefined
             }
 
-            if (typeof params.email !== "string")
-                return [400, "email must be string"]
+            if (!z.string().email().safeParse(typeof params.email).success)
+                return [400, "bad email"]
             if (actor.admin) return params.email
 
             // send verification email
@@ -150,9 +147,6 @@ const validators: {
         )
             return [401, "current password incorrect"]
 
-        if (typeof params.password != "string" || params.password.length < 8)
-            return [400, "password must be 8 characters or longer"]
-
         if (target.email) {
             sendMail(
                 target.email,
@@ -173,24 +167,8 @@ const validators: {
         )
             return [401, "current password incorrect"]
 
-        if (
-            typeof params.username != "string" ||
-            params.username.length < 3 ||
-            params.username.length > 20
-        )
-            return [
-                400,
-                "username must be between 3 and 20 characters in length",
-            ]
-
         if (Accounts.getFromUsername(params.username))
             return [400, "account with this username already exists"]
-
-        if (
-            (params.username.match(/[A-Za-z0-9_\-\.]+/) || [])[0] !=
-            params.username
-        )
-            return [400, "username has invalid characters"]
 
         if (target.email) {
             sendMail(
@@ -207,12 +185,7 @@ const validators: {
     customCSS: {
         acceptsNull: true,
         validator: (actor, target, params) => {
-            if (
-                !params.customCSS ||
-                (params.customCSS.match(id_check_regex)?.[0] ==
-                    params.customCSS &&
-                    params.customCSS.length <= Configuration.maxUploadIdLength)
-            )
+            if (FileSchemas.FileId.safeParse(params.customCSS).success)
                 return params.customCSS
             else return [400, "bad file id"]
         },
@@ -272,7 +245,10 @@ function isMessage(object: any): object is Message {
 }
 
 export default function (files: Files) {
-    router.post("/", async (ctx) => {
+    router.post("/", scheme(z.object({
+        username: AccountSchemas.Username,
+        password: AccountSchemas.StringPassword
+    })), async (ctx) => {
         const body = await ctx.req.json()
         if (!Configuration.accounts.registrationEnabled) {
             return ServeError(ctx, 403, "account registration disabled")
@@ -287,28 +263,6 @@ export default function (files: Files) {
                 ctx,
                 400,
                 "account with this username already exists"
-            )
-        }
-
-        if (body.username.length < 3 || body.username.length > 20) {
-            return ServeError(
-                ctx,
-                400,
-                "username must be over or equal to 3 characters or under or equal to 20 characters in length"
-            )
-        }
-
-        if (
-            (body.username.match(/[A-Za-z0-9_\-\.]+/) || [])[0] != body.username
-        ) {
-            return ServeError(ctx, 400, "username contains invalid characters")
-        }
-
-        if (body.password.length < 8) {
-            return ServeError(
-                ctx,
-                400,
-                "password must be 8 characters or longer"
             )
         }
 

@@ -3,6 +3,7 @@ import type { Context, Handler as RequestHandler } from "hono"
 import ServeError from "../lib/errors.js"
 import * as auth from "./auth.js"
 import { setCookie } from "hono/cookie"
+import { ZodObject } from "zod"
 
 /**
  * @description Middleware which adds an account, if any, to ctx.get("account")
@@ -102,20 +103,10 @@ export const login = (ctx: Context, account: string) => setCookie(ctx, "auth", a
     httpOnly: true
 })
 
-type SchemeType = "array" | "object" | "string" | "number" | "boolean"
-
-interface SchemeObject {
-    type: "object"
-    children: {
-        [key: string]: SchemeParameter
+export const scheme = function(scheme: ZodObject<any>): RequestHandler {
+    return function(ctx, next) {
+        let chk = scheme.safeParse(ctx.req.json())
+        if (chk.success) next()
+        else ServeError(ctx, 400, chk.error.message)
     }
 }
-
-interface SchemeArray {
-    type: "array"
-    children:
-        | SchemeParameter /* All children of the array must be this type */
-        | SchemeParameter[] /* Array must match this pattern */
-}
-
-type SchemeParameter = SchemeType | SchemeObject | SchemeArray
