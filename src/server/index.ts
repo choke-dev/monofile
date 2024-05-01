@@ -9,7 +9,7 @@ import { fileURLToPath } from "url"
 import { dirname } from "path"
 import config from "./lib/config.js"
 
-const app = new Hono()
+const app = new Hono({strict: false})
 
 app.get(
     "/static/assets/*",
@@ -78,7 +78,7 @@ apiRouter.loadAPIMethods().then(() => {
         app.fetch(
             new Request(
                 new URL(
-                    "/api/v1/info",
+                    "/api/v1",
                     ctx.req.raw.url
                 ).href,
                 ctx.req.raw

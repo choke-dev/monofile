@@ -1,19 +1,19 @@
 import fs from "fs"
 import { stat } from "fs/promises"
-import Files from "./lib/files.js"
+import Files from "../lib/files.js"
 import { program } from "commander"
 import { basename } from "path"
 import { Writable } from "node:stream"
-import config from "./lib/config.js"
-import pkg from "../../package.json" assert { type: "json" }
+import config from "../lib/config.js"
+import pkg from "../../../package.json" assert { type: "json" }
 import { fileURLToPath } from "url"
 import { dirname } from "path"
 
 // init data
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-if (!fs.existsSync(__dirname + "/../../.data/"))
-    fs.mkdirSync(__dirname + "/../../.data/")
+if (!fs.existsSync(__dirname + "/../../../.data/"))
+    fs.mkdirSync(__dirname + "/../../../.data/")
 
 // discord
 let files = new Files(config)

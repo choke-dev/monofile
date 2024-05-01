@@ -8,22 +8,24 @@ import config, { Configuration } from "./config.js"
 import "dotenv/config"
 
 import * as Accounts from "./accounts.js"
+import { z } from "zod"
+import * as schemas from "./schemas/files.js"
+import { issuesToMessage } from "./middleware.js"
 
-export let id_check_regex = /[A-Za-z0-9_\-\.\!\=\:\&\$\,\+\;\@\~\*\(\)\']+/
 export let alphanum = Array.from(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 )
 
 // bad solution but whatever
 
-export type FileVisibility = "public" | "anonymous" | "private"
+export type FileVisibility = z.infer<typeof schemas.FileVisibility>
 
 /**
  * @description Generates an alphanumeric string, used for files
  * @param length Length of the ID
  * @returns a random alphanumeric string
  */
-export function generateFileId(length: number = 5) {
+export function generateFileId(length: number = 5): z.infer<typeof schemas.FileId> {
     let fid = ""
     for (let i = 0; i < length; i++) {
         fid += alphanum[crypto.randomInt(0, alphanum.length)]
@@ -31,35 +33,7 @@ export function generateFileId(length: number = 5) {
     return fid
 }
 
-/**
- * @description Assert multiple conditions... this exists out of pure laziness
- * @param conditions
- */
-
-function multiAssert(
-    conditions: Map<boolean, { message: string; status: number }>
-) {
-    for (let [cond, err] of conditions.entries()) {
-        if (cond) return err
-    }
-}
-
-export type FileUploadSettings = Partial<Pick<FilePointer, "mime" | "owner">> &
-    Pick<FilePointer, "mime" | "filename"> & { uploadId?: string }
-
-export interface FilePointer {
-    filename: string
-    mime: string
-    messageids: string[]
-    owner?: string
-    sizeInBytes?: number
-    tag?: string
-    visibility?: FileVisibility
-    reserved?: boolean
-    chunkSize?: number
-    lastModified?: number
-    md5?: string
-}
+export type FilePointer = z.infer<typeof schemas.FilePointer>
 
 export interface StatusCodeError {
     status: number
@@ -470,9 +444,9 @@ export class UploadStream extends Writable {
             sizeInBytes: this.filled,
             visibility: ogf
                 ? ogf.visibility
-                : this.owner
-                  ? Accounts.getFromId(this.owner)?.defaultFileVisibility
-                  : undefined,
+                : this.owner 
+                    && Accounts.getFromId(this.owner)?.defaultFileVisibility 
+                    || "public",
             // so that json.stringify doesnt include tag:undefined
             ...((ogf || {}).tag ? { tag: ogf.tag } : {}),
 
@@ -527,12 +501,11 @@ export class UploadStream extends Writable {
             return this.destroy(
                 new WebError(400, "duplicate attempt to set upload ID")
             )
-        if (
-            !id ||
-            id.match(id_check_regex)?.[0] != id ||
-            id.length > this.files.config.maxUploadIdLength
-        )
-            return this.destroy(new WebError(400, "invalid file ID"))
+
+        let check = schemas.FileId.safeParse(id);
+
+        if (!check.success)
+            return this.destroy(new WebError(400, issuesToMessage(check.error.issues)))
 
         if (this.files.files[id] && this.files.files[id].owner != this.owner)
             return this.destroy(new WebError(403, "you don't own this file"))

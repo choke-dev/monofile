@@ -68,10 +68,6 @@ export default function (files: Files) {
 
                 let fp = files.files[e]
 
-                if (fp.reserved) {
-                    return
-                }
-
                 switch (body.action) {
                     case "delete":
                         files.unlink(e, true)
