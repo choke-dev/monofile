@@ -34,16 +34,24 @@ export default function (files: Files) {
     })), async (ctx) => {
         const body = await ctx.req.json()
 
-        if (auth.validate(getCookie(ctx, "auth")!)) {
-            ServeError(ctx, 400, "you are already logged in")
-            return
-        }
+        if (ctx.get("account"))
+            return ServeError(ctx, 400, "you are already logged in")
 
         const account = Accounts.getFromUsername(body.username)
 
         if (!account || !Accounts.password.check(account.id, body.password)) {
-            ServeError(ctx, 400, "username or password incorrect")
-            return
+            return ServeError(ctx, 400, "username or password incorrect")
+        }
+
+        if (account.suspension) {
+            if (account.suspension.until && Date.now() > account.suspension.until) delete account.suspension;
+            else return ServeError(
+                ctx, 
+                403, 
+                `account ${account.suspension.until 
+                    ? `suspended until ${new Date(account.suspension.until).toUTCString()}` 
+                    : "suspended indefinitely"
+                }: ${account.suspension.reason}`)
         }
 
         login(ctx, account.id)
@@ -59,12 +67,8 @@ export default function (files: Files) {
         })
     })
 
-    router.delete("/", (ctx) => {
-        if (!auth.validate(getCookie(ctx, "auth")!)) {
-            return ServeError(ctx, 401, "not logged in")
-        }
-
-        auth.invalidate(getCookie(ctx, "auth")!)
+    router.delete("/", requiresAccount, (ctx) => {
+        auth.invalidate(auth.tokenFor(ctx)!)
         return ctx.text("logged out")
     })
 

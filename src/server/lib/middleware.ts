@@ -9,7 +9,10 @@ import { z } from "zod"
  * @description Middleware which adds an account, if any, to ctx.get("account")
  */
 export const getAccount: RequestHandler = function (ctx, next) {
-    ctx.set("account", Accounts.getFromToken(auth.tokenFor(ctx)!))
+    let account = Accounts.getFromToken(auth.tokenFor(ctx)!)
+    if (account?.suspension)
+        setCookie(ctx, "auth", "")
+    ctx.set("account", account)
     return next()
 }
 

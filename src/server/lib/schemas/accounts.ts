@@ -53,7 +53,11 @@ export namespace Settings {
         interface: Interface.default({}), links: Links.default({})
     })
 }
-
+export const Suspension =
+    z.object({
+        reason: z.string(),
+        until: z.number().nullable()
+    })
 export const Account =
     z.object({
         id: z.string(),
@@ -64,5 +68,6 @@ export const Account =
         admin: z.boolean(),
         defaultFileVisibility: FileVisibility,
 
-        settings: Settings.User
+        settings: Settings.User,
+        suspension: Suspension.optional()
     })

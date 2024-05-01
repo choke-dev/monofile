@@ -101,9 +101,7 @@ const validators: {
                 return undefined
             }
 
-            if (!z.string().email().safeParse(typeof params.email).success)
-                return [400, "bad email"]
-            if (actor.admin) return params.email
+            if (actor.admin) return params.email || undefined
 
             // send verification email
 
@@ -189,6 +187,13 @@ const validators: {
             if (actor.admin && !target.admin) return params.admin
             else if (!actor.admin) return [400, "cannot promote yourself"]
             else return [400, "cannot demote an admin"]
+        }
+    },
+    suspension: {
+        schema: AccountSchemas.Suspension.nullable(),
+        validator: (actor, target, params) => {
+            if (!actor.admin) return [400, "only admins can modify suspensions"]
+            return params.suspension || undefined
         }
     },
     settings: {
