@@ -1,7 +1,10 @@
 import {z} from "zod"
 import config from "../config.js"
 
-export const FileId = z.string().regex(/[A-Za-z0-9_\-\.\!\=\:\&\$\,\+\;\@\~\*\(\)\']+/).max(config.maxUploadIdLength)
+export const FileId = z.string()
+    .regex(/[A-Za-z0-9_\-\.\!\=\:\&\$\,\+\;\@\~\*\(\)\']+/,"file ID uses invalid characters")
+    .max(config.maxUploadIdLength,"file ID too long")
+    .min(1, "you... *need* a file ID")
 export const FileVisibility = z.enum(["public", "anonymous", "private"])
 export const FileTag = z.string().toLowerCase().max(30, "tag length too long")
 export const FilePointer = z.object({
