@@ -2,22 +2,14 @@ import crypto from "crypto"
 import { getCookie } from "hono/cookie"
 import type { Context } from "hono"
 import { readFile, writeFile } from "fs/promises"
+import { z } from "zod"
+import * as jose from "jose"
+import { AuthSchemas } from "./schemas/index.js"
 export let AuthTokens: AuthToken[] = []
 export let AuthTokenTO: { [key: string]: NodeJS.Timeout } = {}
 
-export const ValidTokenPermissions = [
-    "user", // permissions to /auth/me, with email docked
-    "email", // adds email back to /auth/me
-    "private", // allows app to read private files
-    "upload", // allows an app to upload under an account
-    "manage", // allows an app to manage an account's files
-    "customize", // allows an app to change customization settings
-    "admin", // only available for accounts with admin
-    // gives an app access to all admin tools
-] as const
-
-export type TokenType = "User" | "App"
-export type TokenPermission = (typeof ValidTokenPermissions)[number]
+export type TokenType = z.infer<typeof AuthSchemas.TokenType>
+export type TokenPermission = z.infer<typeof AuthSchemas.TokenPermission>
 
 export interface AuthToken {
     account: string
