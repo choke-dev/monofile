@@ -4,6 +4,7 @@
     "mount": [
         "account",
         "session",
+        "info",
         {
             "file": "file/index",
             "to": "/file"
