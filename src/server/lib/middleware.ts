@@ -103,6 +103,7 @@ export const issuesToMessage = function(issues: z.ZodIssue[]) {
 export const scheme = function(scheme: z.ZodTypeAny): RequestHandler {
     return async function(ctx, next) {
         let chk = scheme.safeParse(await ctx.req.json())
+        ctx.set("parsedScheme", chk.data)
         if (chk.success) return next()
         else return ServeError(ctx, 400, issuesToMessage(chk.error.issues))
     }

@@ -149,7 +149,7 @@ export namespace files {
      * @param fileId The target file's ID
      * @returns Promise that resolves after accounts.json finishes writing
      */
-    export function index(accountId:string,fileId:string) {
+    export function index(accountId:string,fileId:string,noWrite:boolean = false) {
         // maybe replace with a obj like
         // { x:true }
         // for faster lookups? not sure if it would be faster
@@ -158,7 +158,7 @@ export namespace files {
         if (acc.files.find(e => e == fileId)) return
 
         acc.files.push(fileId)
-        return save()
+        if (!noWrite) return save()
     }
 
     /**

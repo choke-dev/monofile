@@ -11,6 +11,7 @@ import * as Accounts from "./accounts.js"
 import { z } from "zod"
 import * as schemas from "./schemas/files.js"
 import { issuesToMessage } from "./middleware.js"
+import file from "../routes/api/v1/file/index.js"
 
 export let alphanum = Array.from(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
@@ -695,8 +696,41 @@ export default class Files {
         delete this.files[uploadId]
 
         if (!noWrite)
-            this.write().catch((err) => {
-                throw err
-            })
+            return this.write()
+    }
+
+    async chown(uploadId: string, newOwner?: string, noWrite: boolean = false) {
+        let target = this.files[uploadId]
+        if (target.owner) {
+            let i = files.deindex(target.owner, uploadId, Boolean(newOwner && noWrite))
+            if (i) await i
+        }
+
+        target.owner = newOwner
+        if (newOwner) {
+            let i = files.index(newOwner, uploadId, noWrite)
+            if (i) await i
+        }
+
+        if (!noWrite)
+            return this.write()
+    }
+    
+    async mv(uploadId: string, newId: string, noWrite: boolean = false) {
+        let target = this.files[uploadId]
+        if (target.owner) {
+            let owner = Accounts.getFromId(target.owner)
+            if (owner) {
+                owner.files.splice(owner.files.indexOf(uploadId), 1, newId)
+                if (!noWrite)
+                    await Accounts.save()
+            }
+        }
+
+        this.files[newId] = target
+        delete this.files[uploadId]
+
+        if (!noWrite)
+            return this.write()
     }
 }
