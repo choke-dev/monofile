@@ -5,21 +5,25 @@ import { getCookie, setCookie } from "hono/cookie"
 
 // Libs
 
-import Files, { id_check_regex } from "../../../lib/files.js"
+import Files from "../../../lib/files.js"
 import * as Accounts from "../../../lib/accounts.js"
 import * as auth from "../../../lib/auth.js"
 import {
     assertAPI,
     getAccount,
+    issuesToMessage,
     login,
     noAPIAccess,
     requiresAccount,
     requiresPermissions,
+    scheme,
 } from "../../../lib/middleware.js"
 import ServeError from "../../../lib/errors.js"
 import { CodeMgr, sendMail } from "../../../lib/mail.js"
 
 import Configuration from "../../../lib/config.js"
+import { AccountSchemas, FileSchemas } from "../../../lib/schemas/index.js"
+import { z } from "zod"
 
 const router = new Hono<{
     Variables: {
@@ -40,8 +44,7 @@ type Message = [200 | 400 | 401 | 403 | 429 | 501, string]
 // @Jack5079 make typings better if possible
 
 type Validator<
-    T extends keyof Partial<Accounts.Account>,
-    ValueNotNull extends boolean,
+    T extends keyof Partial<Accounts.Account>
 > =
     /**
      * @param actor The account performing this action
@@ -52,44 +55,33 @@ type Validator<
         actor: Accounts.Account,
         target: Accounts.Account,
         params: UserUpdateParameters &
-            (ValueNotNull extends true
-                ? {
-                      [K in keyof Pick<
-                          UserUpdateParameters,
-                          T
-                      >]-?: UserUpdateParameters[K]
-                  }
-                : {}),
+            {
+                [K in keyof Pick<
+                    UserUpdateParameters,
+                    T
+                >]-?: UserUpdateParameters[K]
+            },
         ctx: Context
     ) => Accounts.Account[T] | Message
 
-// this type is so stupid stg
-type ValidatorWithSettings<T extends keyof Partial<Accounts.Account>> =
-    | {
-          acceptsNull: true
-          validator: Validator<T, false>
-      }
-    | {
-          acceptsNull?: false
-          validator: Validator<T, true>
-      }
+type SchemedValidator<
+    T extends keyof Partial<Accounts.Account>
+> = {
+    validator: Validator<T>,
+    schema: z.ZodTypeAny
+}
 
 const validators: {
-    [T in keyof Partial<Accounts.Account>]:
-        | Validator<T, true>
-        | ValidatorWithSettings<T>
+    [T in keyof Partial<Accounts.Account>]: SchemedValidator<T>
 } = {
-    defaultFileVisibility(actor, target, params) {
-        if (
-            ["public", "private", "anonymous"].includes(
-                params.defaultFileVisibility
-            )
-        )
+    defaultFileVisibility: {
+        schema: FileSchemas.FileVisibility,
+        validator: (actor, target, params) => {
             return params.defaultFileVisibility
-        else return [400, "invalid file visibility"]
+        }
     },
     email: {
-        acceptsNull: true,
+        schema: AccountSchemas.Account.shape.email.nullable(),
         validator: (actor, target, params, ctx) => {
             if (
                 !params.currentPassword || // actor on purpose here to allow admins
@@ -109,9 +101,7 @@ const validators: {
                 return undefined
             }
 
-            if (typeof params.email !== "string")
-                return [400, "email must be string"]
-            if (actor.admin) return params.email
+            if (actor.admin) return params.email || undefined
 
             // send verification email
 
@@ -142,106 +132,86 @@ const validators: {
             return [200, "please check your inbox"]
         },
     },
-    password(actor, target, params) {
-        if (
-            !params.currentPassword || // actor on purpose here to allow admins
-            (params.currentPassword &&
-                Accounts.password.check(actor.id, params.currentPassword))
-        )
-            return [401, "current password incorrect"]
-
-        if (typeof params.password != "string" || params.password.length < 8)
-            return [400, "password must be 8 characters or longer"]
-
-        if (target.email) {
-            sendMail(
-                target.email,
-                `Your login details have been updated`,
-                `<b>Hello there!</b> Your password on your account, <span username>${target.username}</span>, has been updated` +
-                    `${actor != target ? ` by <span username>${actor.username}</span>` : ""}. ` +
-                    `Please update your saved login details accordingly.`
-            ).catch()
-        }
-
-        return Accounts.password.hash(params.password)
-    },
-    username(actor, target, params) {
-        if (
-            !params.currentPassword || // actor on purpose here to allow admins
-            (params.currentPassword &&
-                Accounts.password.check(actor.id, params.currentPassword))
-        )
-            return [401, "current password incorrect"]
-
-        if (
-            typeof params.username != "string" ||
-            params.username.length < 3 ||
-            params.username.length > 20
-        )
-            return [
-                400,
-                "username must be between 3 and 20 characters in length",
-            ]
-
-        if (Accounts.getFromUsername(params.username))
-            return [400, "account with this username already exists"]
-
-        if (
-            (params.username.match(/[A-Za-z0-9_\-\.]+/) || [])[0] !=
-            params.username
-        )
-            return [400, "username has invalid characters"]
-
-        if (target.email) {
-            sendMail(
-                target.email,
-                `Your login details have been updated`,
-                `<b>Hello there!</b> Your username on your account, <span username>${target.username}</span>, has been updated` +
-                    `${actor != target ? ` by <span username>${actor.username}</span>` : ""} to <span username>${params.username}</span>. ` +
-                    `Please update your saved login details accordingly.`
-            ).catch()
-        }
-
-        return params.username
-    },
-    customCSS: {
-        acceptsNull: true,
+    password: {
+        schema: AccountSchemas.StringPassword,
         validator: (actor, target, params) => {
             if (
-                !params.customCSS ||
-                (params.customCSS.match(id_check_regex)?.[0] ==
-                    params.customCSS &&
-                    params.customCSS.length <= Configuration.maxUploadIdLength)
+                !params.currentPassword || // actor on purpose here to allow admins
+                (params.currentPassword &&
+                    Accounts.password.check(actor.id, params.currentPassword))
             )
-                return params.customCSS
-            else return [400, "bad file id"]
-        },
+                return [401, "current password incorrect"]
+
+            if (target.email) {
+                sendMail(
+                    target.email,
+                    `Your login details have been updated`,
+                    `<b>Hello there!</b> Your password on your account, <span username>${target.username}</span>, has been updated` +
+                        `${actor != target ? ` by <span username>${actor.username}</span>` : ""}. ` +
+                        `Please update your saved login details accordingly.`
+                ).catch()
+            }
+
+            return Accounts.password.hash(params.password)
+        }
     },
-    embed(actor, target, params) {
-        if (typeof params.embed !== "object")
-            return [400, "must use an object for embed"]
-        if (params.embed.color === undefined) {
-            params.embed.color = target.embed?.color
-        } else if (
-            !(
-                (params.embed.color.toLowerCase().match(/[a-f0-9]+/)?.[0] ==
-                    params.embed.color.toLowerCase() &&
-                    params.embed.color.length == 6) ||
-                params.embed.color == null
+    username: {
+        schema: AccountSchemas.Username,
+        validator: (actor, target, params) => {
+            if (
+                !params.currentPassword || // actor on purpose here to allow admins
+                (params.currentPassword &&
+                    Accounts.password.check(actor.id, params.currentPassword))
             )
-        )
-            return [400, "bad embed color"]
+                return [401, "current password incorrect"]
 
-        if (params.embed.largeImage === undefined) {
-            params.embed.largeImage = target.embed?.largeImage
-        } else params.embed.largeImage = Boolean(params.embed.largeImage)
+            if (Accounts.getFromUsername(params.username))
+                return [400, "account with this username already exists"]
 
-        return params.embed
+            if (target.email) {
+                sendMail(
+                    target.email,
+                    `Your login details have been updated`,
+                    `<b>Hello there!</b> Your username on your account, <span username>${target.username}</span>, has been updated` +
+                        `${actor != target ? ` by <span username>${actor.username}</span>` : ""} to <span username>${params.username}</span>. ` +
+                        `Please update your saved login details accordingly.`
+                ).catch()
+            }
+
+            return params.username
+        }
     },
-    admin(actor, target, params) {
-        if (actor.admin && !target.admin) return params.admin
-        else if (!actor.admin) return [400, "cannot promote yourself"]
-        else return [400, "cannot demote an admin"]
+    admin: {
+        schema: z.boolean(),
+        validator: (actor, target, params) => {
+            if (actor.admin && !target.admin) return params.admin
+            else if (!actor.admin) return [400, "cannot promote yourself"]
+            else return [400, "cannot demote an admin"]
+        }
+    },
+    suspension: {
+        schema: AccountSchemas.Suspension.nullable(),
+        validator: (actor, target, params) => {
+            if (!actor.admin) return [400, "only admins can modify suspensions"]
+            return params.suspension || undefined
+        }
+    },
+    settings: {
+        schema: AccountSchemas.Settings.User.partial(),
+        validator: (actor, target, params) => {
+            let base = AccountSchemas.Settings.User.default({}).parse(target.settings)
+
+            let visit = (bse: Record<string, any>, nw: Record<string, any>) => {
+                for (let [key,value] of Object.entries(nw)) {
+                    if (typeof value == "object") visit(bse[key], value)
+                    else bse[key] = value
+                }
+            }
+
+            visit(base, params.settings)
+            
+            return AccountSchemas.Settings.User.parse(base) // so that toLowerCase is called again... yeah that's it
+        }
     },
 }
 
@@ -272,7 +242,10 @@ function isMessage(object: any): object is Message {
 }
 
 export default function (files: Files) {
-    router.post("/", async (ctx) => {
+    router.post("/", scheme(z.object({
+        username: AccountSchemas.Username,
+        password: AccountSchemas.StringPassword
+    })), async (ctx) => {
         const body = await ctx.req.json()
         if (!Configuration.accounts.registrationEnabled) {
             return ServeError(ctx, 403, "account registration disabled")
@@ -290,35 +263,14 @@ export default function (files: Files) {
             )
         }
 
-        if (body.username.length < 3 || body.username.length > 20) {
-            return ServeError(
-                ctx,
-                400,
-                "username must be over or equal to 3 characters or under or equal to 20 characters in length"
-            )
-        }
-
-        if (
-            (body.username.match(/[A-Za-z0-9_\-\.]+/) || [])[0] != body.username
-        ) {
-            return ServeError(ctx, 400, "username contains invalid characters")
-        }
-
-        if (body.password.length < 8) {
-            return ServeError(
-                ctx,
-                400,
-                "password must be 8 characters or longer"
-            )
-        }
-
         return Accounts.create(body.username, body.password)
             .then((account) => {
                 login(ctx, account)
                 return ctx.text("logged in")
             })
-            .catch(() => {
-                return ServeError(ctx, 500, "internal server error")
+            .catch((e) => {
+                console.error(e)
+                return ServeError(ctx, 500, e instanceof z.ZodError ? issuesToMessage(e.issues) : "internal server error")
             })
     })
 
@@ -352,23 +304,11 @@ export default function (files: Files) {
                         `the ${x} parameter cannot be set or is not a valid parameter`,
                     ] as Message
 
-                let validator = (
-                    typeof validators[x] == "object"
-                        ? validators[x]
-                        : {
-                              validator: validators[x] as Validator<
-                                  typeof x,
-                                  false
-                              >,
-                              acceptsNull: false,
-                          }
-                ) as ValidatorWithSettings<typeof x>
+                let validator = validators[x]!
 
-                if (!validator.acceptsNull && !v)
-                    return [
-                        400,
-                        `the ${x} validator does not accept null values`,
-                    ] as Message
+                let check = validator.schema.safeParse(v)
+                if (!check.success)
+                    return [400, issuesToMessage(check.error.issues)]
 
                 return [
                     x,
@@ -435,12 +375,6 @@ export default function (files: Files) {
                     (e.expire > Date.now() || !e.expire)
             ).length,
         })
-    })
-
-    router.get("/css", async (ctx) => {
-        let acc = ctx.get("account")
-        if (acc?.customCSS) return ctx.redirect(`/file/${acc.customCSS}`)
-        else return ctx.text("")
     })
 
     return router

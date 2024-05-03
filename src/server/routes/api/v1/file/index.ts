@@ -4,17 +4,20 @@ import * as auth from "../../../../lib/auth.js"
 import RangeParser, { type Range } from "range-parser"
 import ServeError from "../../../../lib/errors.js"
 import Files, { WebError } from "../../../../lib/files.js"
-import { getAccount, requiresPermissions } from "../../../../lib/middleware.js"
+import { getAccount, requiresAccount, requiresPermissions, scheme } from "../../../../lib/middleware.js"
 import {Readable} from "node:stream"
 import type {ReadableStream as StreamWebReadable} from "node:stream/web"
 import formidable from "formidable"
 import { HttpBindings } from "@hono/node-server"
 import pkg from "../../../../../../package.json" assert {type: "json"}
 import { type StatusCode } from "hono/utils/http-status"
+import { z } from "zod"
+import { FileSchemas } from "../../../../lib/schemas/index.js"
 
 const router = new Hono<{
     Variables: {
-        account: Accounts.Account
+        account: Accounts.Account,
+        parsedSchema: any
     },
     Bindings: HttpBindings
 }>()

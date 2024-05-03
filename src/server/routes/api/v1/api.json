@@ -5,6 +5,10 @@
         "account",
         "session",
         {
+            "file": "index",
+            "to": "/"
+        },
+        {
             "file": "file/index",
             "to": "/file"
         },

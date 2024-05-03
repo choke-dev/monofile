@@ -4,15 +4,12 @@ import { Hono } from "hono"
 import fs from "fs"
 import { readFile } from "fs/promises"
 import Files from "./lib/files.js"
-import { getAccount } from "./lib/middleware.js"
 import APIRouter from "./routes/api.js"
-import preview from "./routes/api/web/preview.js"
 import { fileURLToPath } from "url"
 import { dirname } from "path"
-import pkg from "../../package.json" assert { type: "json" }
-import config, { ClientConfiguration } from "./lib/config.js"
+import config from "./lib/config.js"
 
-const app = new Hono()
+const app = new Hono({strict: false})
 
 app.get(
     "/static/assets/*",
@@ -60,16 +57,6 @@ if (config.forceSSL) {
     })
 }
 
-app.get("/server", (ctx) =>
-    ctx.json({
-        version: pkg.version,
-        files: Object.keys(files.files).length,
-        maxDiscordFiles: config.maxDiscordFiles,
-        maxDiscordFileSize: config.maxDiscordFileSize,
-        accounts: config.accounts,
-    } as ClientConfiguration)
-)
-
 // funcs
 
 // init data
@@ -87,6 +74,19 @@ apiRouter.loadAPIMethods().then(() => {
     console.log("API OK!")
 
     // moved here to ensure it's matched last
+    app.get("/server", async (ctx) =>
+        app.fetch(
+            new Request(
+                new URL(
+                    "/api/v1",
+                    ctx.req.raw.url
+                ).href,
+                ctx.req.raw
+            ),
+            ctx.env
+        )
+    )
+
     app.get("/:fileId", async (ctx) =>
         app.fetch(
             new Request(

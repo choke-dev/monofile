@@ -9,13 +9,13 @@ export interface Configuration {
     maxDiscordFiles: number
     maxDiscordFileSize: number
     maxUploadIdLength: number
-    targetGuild: string
     targetChannel: string
     accounts: {
         registrationEnabled: boolean
         requiredForUpload: boolean
     }
     mail: {
+        enabled: boolean
         transport: {
             host: string
             port: number
@@ -32,6 +32,8 @@ export interface Configuration {
 export interface ClientConfiguration {
     version: string
     files: number
+    totalSize: number
+    mailEnabled: boolean
     maxDiscordFiles: number
     maxDiscordFileSize: number
     accounts: {
@@ -49,7 +51,6 @@ export default {
     maxDiscordFiles: Number(process.env.MAX__DISCORD_FILES),
     maxDiscordFileSize: Number(process.env.MAX__DISCORD_FILE_SIZE),
     maxUploadIdLength: Number(process.env.MAX__UPLOAD_ID_LENGTH),
-    targetGuild: process.env.TARGET__GUILD,
     targetChannel: process.env.TARGET__CHANNEL,
     accounts: {
         registrationEnabled:
@@ -58,6 +59,8 @@ export default {
     },
 
     mail: {
+        enabled: ["HOST","PORT","SEND_FROM","USER","PASS"].every(e => Boolean(process.env[`MAIL__${e}`])),
+
         transport: {
             host: process.env.MAIL__HOST,
             port: Number(process.env.MAIL__PORT),

@@ -3,12 +3,16 @@ import type { Context, Handler as RequestHandler } from "hono"
 import ServeError from "../lib/errors.js"
 import * as auth from "./auth.js"
 import { setCookie } from "hono/cookie"
+import { z } from "zod"
 
 /**
  * @description Middleware which adds an account, if any, to ctx.get("account")
  */
 export const getAccount: RequestHandler = function (ctx, next) {
-    ctx.set("account", Accounts.getFromToken(auth.tokenFor(ctx)!))
+    let account = Accounts.getFromToken(auth.tokenFor(ctx)!)
+    if (account?.suspension)
+        setCookie(ctx, "auth", "")
+    ctx.set("account", account)
     return next()
 }
 
@@ -37,7 +41,6 @@ export const requiresAdmin: RequestHandler = function (ctx, next) {
  * @param tokenPermissions Permissions which your route requires.
  * @returns Express middleware
  */
-
 export const requiresPermissions = function (
     ...tokenPermissions: auth.TokenPermission[]
 ): RequestHandler {
@@ -93,6 +96,19 @@ export const assertAPI = function (
     }
 }
 
+export const issuesToMessage = function(issues: z.ZodIssue[]) {
+    return issues.map(e => `${e.path}: ${e.code} :: ${e.message}`).join("; ")
+}
+
+export const scheme = function(scheme: z.ZodTypeAny): RequestHandler {
+    return async function(ctx, next) {
+        let chk = scheme.safeParse(await ctx.req.json())
+        ctx.set("parsedScheme", chk.data)
+        if (chk.success) return next()
+        else return ServeError(ctx, 400, issuesToMessage(chk.error.issues))
+    }
+}
+
 // Not really middleware but a utility
 
 export const login = (ctx: Context, account: string) => setCookie(ctx, "auth", auth.create(account, 3 * 24 * 60 * 60 * 1000), {
@@ -101,21 +117,3 @@ export const login = (ctx: Context, account: string) => setCookie(ctx, "auth", a
     secure: true,
     httpOnly: true
 })
-
-type SchemeType = "array" | "object" | "string" | "number" | "boolean"
-
-interface SchemeObject {
-    type: "object"
-    children: {
-        [key: string]: SchemeParameter
-    }
-}
-
-interface SchemeArray {
-    type: "array"
-    children:
-        | SchemeParameter /* All children of the array must be this type */
-        | SchemeParameter[] /* Array must match this pattern */
-}
-
-type SchemeParameter = SchemeType | SchemeObject | SchemeArray

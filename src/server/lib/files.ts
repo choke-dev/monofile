@@ -2,28 +2,31 @@ import { readFile, writeFile } from "node:fs/promises"
 import { Readable, Writable } from "node:stream"
 import crypto from "node:crypto"
 import { files } from "./accounts.js"
-import { Client as API } from "./DiscordAPI/index.js"
+import { Client as API, convertSnowflakeToDate } from "./DiscordAPI/index.js"
 import type { APIAttachment } from "discord-api-types/v10"
 import config, { Configuration } from "./config.js"
 import "dotenv/config"
 
 import * as Accounts from "./accounts.js"
+import { z } from "zod"
+import * as schemas from "./schemas/files.js"
+import { issuesToMessage } from "./middleware.js"
+import file from "../routes/api/v1/file/index.js"
 
-export let id_check_regex = /[A-Za-z0-9_\-\.\!\=\:\&\$\,\+\;\@\~\*\(\)\']+/
 export let alphanum = Array.from(
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 )
 
 // bad solution but whatever
 
-export type FileVisibility = "public" | "anonymous" | "private"
+export type FileVisibility = z.infer<typeof schemas.FileVisibility>
 
 /**
  * @description Generates an alphanumeric string, used for files
  * @param length Length of the ID
  * @returns a random alphanumeric string
  */
-export function generateFileId(length: number = 5) {
+export function generateFileId(length: number = 5): z.infer<typeof schemas.FileId> {
     let fid = ""
     for (let i = 0; i < length; i++) {
         fid += alphanum[crypto.randomInt(0, alphanum.length)]
@@ -31,35 +34,7 @@ export function generateFileId(length: number = 5) {
     return fid
 }
 
-/**
- * @description Assert multiple conditions... this exists out of pure laziness
- * @param conditions
- */
-
-function multiAssert(
-    conditions: Map<boolean, { message: string; status: number }>
-) {
-    for (let [cond, err] of conditions.entries()) {
-        if (cond) return err
-    }
-}
-
-export type FileUploadSettings = Partial<Pick<FilePointer, "mime" | "owner">> &
-    Pick<FilePointer, "mime" | "filename"> & { uploadId?: string }
-
-export interface FilePointer {
-    filename: string
-    mime: string
-    messageids: string[]
-    owner?: string
-    sizeInBytes?: number
-    tag?: string
-    visibility?: FileVisibility
-    reserved?: boolean
-    chunkSize?: number
-    lastModified?: number
-    md5?: string
-}
+export type FilePointer = z.infer<typeof schemas.FilePointer>
 
 export interface StatusCodeError {
     status: number
@@ -470,9 +445,9 @@ export class UploadStream extends Writable {
             sizeInBytes: this.filled,
             visibility: ogf
                 ? ogf.visibility
-                : this.owner
-                  ? Accounts.getFromId(this.owner)?.defaultFileVisibility
-                  : undefined,
+                : this.owner 
+                    && Accounts.getFromId(this.owner)?.defaultFileVisibility 
+                    || "public",
             // so that json.stringify doesnt include tag:undefined
             ...((ogf || {}).tag ? { tag: ogf.tag } : {}),
 
@@ -527,12 +502,11 @@ export class UploadStream extends Writable {
             return this.destroy(
                 new WebError(400, "duplicate attempt to set upload ID")
             )
-        if (
-            !id ||
-            id.match(id_check_regex)?.[0] != id ||
-            id.length > this.files.config.maxUploadIdLength
-        )
-            return this.destroy(new WebError(400, "invalid file ID"))
+
+        let check = schemas.FileId.safeParse(id);
+
+        if (!check.success)
+            return this.destroy(new WebError(400, issuesToMessage(check.error.issues)))
 
         if (this.files.files[id] && this.files.files[id].owner != this.owner)
             return this.destroy(new WebError(403, "you don't own this file"))
@@ -651,28 +625,37 @@ export default class Files {
     }
 
     /**
-     * @description Update a file from monofile 1.2 to allow for range requests with Content-Length to that file.
+     * @description Update a file from monofile 1.x to 2.x
      * @param uploadId Target file's ID
      */
 
     async update(uploadId: string) {
         let target_file = this.files[uploadId]
-        let attachment_sizes = []
+        let attachments: APIAttachment[] = []
 
         for (let message of target_file.messageids) {
             let attachments = (await this.api.fetchMessage(message)).attachments
             for (let attachment of attachments) {
-                attachment_sizes.push(attachment.size)
+                attachments.push(attachment)
             }
         }
 
         if (!target_file.sizeInBytes)
-            target_file.sizeInBytes = attachment_sizes.reduce(
-                (a, b) => a + b,
+            target_file.sizeInBytes = attachments.reduce(
+                (a, b) => a + b.size,
                 0
             )
 
-        if (!target_file.chunkSize) target_file.chunkSize = attachment_sizes[0]
+        if (!target_file.chunkSize) target_file.chunkSize = attachments[0].size
+
+        if (!target_file.lastModified) target_file.lastModified = convertSnowflakeToDate(target_file.messageids[target_file.messageids.length-1]).getTime()
+
+        // this feels like needlessly heavy
+        // we should probably just do this in an actual readFile idk
+        if (!target_file.md5) {
+            let hash = crypto.createHash("md5");
+            (await this.readFileStream(uploadId)).pipe(hash).once("end", () => target_file.md5 = hash.digest("hex"))
+        }
     }
 
     /**
@@ -713,8 +696,41 @@ export default class Files {
         delete this.files[uploadId]
 
         if (!noWrite)
-            this.write().catch((err) => {
-                throw err
-            })
+            return this.write()
+    }
+
+    async chown(uploadId: string, newOwner?: string, noWrite: boolean = false) {
+        let target = this.files[uploadId]
+        if (target.owner) {
+            let i = files.deindex(target.owner, uploadId, Boolean(newOwner && noWrite))
+            if (i) await i
+        }
+
+        target.owner = newOwner
+        if (newOwner) {
+            let i = files.index(newOwner, uploadId, noWrite)
+            if (i) await i
+        }
+
+        if (!noWrite)
+            return this.write()
+    }
+    
+    async mv(uploadId: string, newId: string, noWrite: boolean = false) {
+        let target = this.files[uploadId]
+        if (target.owner) {
+            let owner = Accounts.getFromId(target.owner)
+            if (owner) {
+                owner.files.splice(owner.files.indexOf(uploadId), 1, newId)
+                if (!noWrite)
+                    await Accounts.save()
+            }
+        }
+
+        this.files[newId] = target
+        delete this.files[uploadId]
+
+        if (!noWrite)
+            return this.write()
     }
 }
