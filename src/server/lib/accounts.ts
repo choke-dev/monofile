@@ -180,6 +180,7 @@ export namespace files {
  * @returns A promise which resolves when accounts.json finishes writing
  */
 export function save() {
+    console.log("saving accounts")
     return writeFile(`${process.cwd()}/.data/accounts.json`,JSON.stringify(Accounts))
         .catch((err) => console.error(err))
 }

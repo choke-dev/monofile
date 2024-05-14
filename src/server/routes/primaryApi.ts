@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import * as Accounts from "../lib/accounts";
 import * as auth from "../lib/auth";
 import axios, { AxiosResponse } from "axios"
-import { type Range } from "range-parser";
+//import { type Range } from "range-parser";
 import multer, {memoryStorage} from "multer"
 
 import ServeError from "../lib/errors";
@@ -43,7 +43,7 @@ primaryApi.get(["/file/:fileId", "/cpt/:fileId/*", "/:fileId"], async (req:expre
             return
         }
 
-        let range: Range | undefined
+        let range: any //: Range | undefined
 
         res.setHeader("Content-Type",file.mime)
         if (file.sizeInBytes) {

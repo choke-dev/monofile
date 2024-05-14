@@ -78,7 +78,7 @@
                     <div class="fields" out:padding_scaleY|local={{easingFunc:circIn}} in:padding_scaleY|local>
                         {#if !$serverStats.accounts.registrationEnabled && targetAction == "create"}
                             <div class="pwError">
-                                <div style:background-color="#554C33">
+                                <div style:background-color="#553333">
                                     <p>Account registration has been disabled by this instance's owner</p>
                                 </div>
                             </div>

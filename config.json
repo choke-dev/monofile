@@ -1,27 +1,27 @@
 {
     "maxDiscordFiles": 20,
     "maxDiscordFileSize": 26214400,
-    "targetGuild": "1024080490677936248",
-    "targetChannel": "1024080525993971913",
-    "requestTimeout":120000,
-    "maxUploadIdLength":30,
+    "targetGuild": "1239878911924375584",
+    "targetChannel": "1239883448244764672",
+    "requestTimeout": 120000,
+    "maxUploadIdLength": 30,
 
     "accounts": {
-        "registrationEnabled": true,
-        "requiredForUpload": false
+        "registrationEnabled": false,
+        "requiredForUpload": true
     },
 
     "mail": {
         "transport": {
-            "host": "smtp.fastmail.com",
-            "port": 465,
-            "secure": true
+            "host": "smtp.sparkpostmail.com",
+            "port": 587,
+            "secure": false
         },
         "send": {
-            "from": "mono@fyle.uk"
+            "from": "fileshare@emails.choke.dev"
         }
     },
 
     "trustProxy": true,
-    "forceSSL": true
+    "forceSSL": false
 }

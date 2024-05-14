@@ -77,6 +77,7 @@ export function getPermissions(token:string): TokenPermission[] | undefined {
 
 export function tokenTimer(token:AuthToken) {
     if (!token.expire) return // justincase
+    if (token.expire === Infinity) return;
     if (Date.now() >= token.expire) {
         invalidate(token.token)
         return
